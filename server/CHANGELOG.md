@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/krezh/binix/compare/binix-server-0.2.0...binix-server-0.2.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* update route path parameters to Axum 0.8 syntax ([8afbdba](https://github.com/krezh/binix/commit/8afbdba2c6526617818131061821502357b1a397))
+
 ## [0.2.0](https://github.com/krezh/binix/compare/binix-server-v0.1.0...binix-server-v0.2.0) (2025-12-10)
 
 
