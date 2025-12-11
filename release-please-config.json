@@ -1,4 +1,5 @@
 {
+  "group-pull-request-title-pattern": "chore: release ${version}",
   "include-v-in-tag": false,
   "include-component-in-tag": true,
   "release-type": "rust",
