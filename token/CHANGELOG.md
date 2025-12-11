@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/krezh/binix/compare/binix-token-0.2.0...binix-token-0.2.1) (2025-12-11)
+
+
+### Miscellaneous Chores
+
+* **binix-token:** Synchronize binix versions
+
 ## [0.2.0](https://github.com/krezh/binix/compare/binix-token-v0.1.0...binix-token-v0.2.0) (2025-12-10)
 
 
