@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/krezh/binix/compare/binix-client-0.2.0...binix-client-0.2.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* maybe fix release-please and lower default client chunking values ([9b5e4a9](https://github.com/krezh/binix/commit/9b5e4a923821915aa0fd16ca397936ab1e7bfdae))
+
 ## [0.2.0](https://github.com/krezh/binix/compare/binix-client-v0.1.0...binix-client-v0.2.0) (2025-12-10)
 
 
