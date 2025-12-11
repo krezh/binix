@@ -3,11 +3,6 @@
   "include-v-in-tag": false,
   "include-component-in-tag": false,
   "packages": {
-    ".": {
-      "release-type": "rust",
-      "package-name": "binix",
-      "component": "binix"
-    },
     "binix": {
       "release-type": "rust",
       "package-name": "binix",
