@@ -12,13 +12,13 @@ name = "binix"
 changelog_include = ["binix"] # include commits from `package_b` in the changelog
 
 [[package]]
-name = "server"
+name = "binix-server"
 
 [[package]]
-name = "client"
+name = "binix-client"
 
 [[package]]
-name = "token"
+name = "binix-token"
 
 [changelog]
 protect_breaking_commits = true # always include commits with breaking changes in the changelog
