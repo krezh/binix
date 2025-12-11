@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/krezh/binix/compare/0.2.2...0.2.3) (2025-12-11)
+
+
+### Bug Fixes
+
+* maybe ([2432633](https://github.com/krezh/binix/commit/2432633d5317c09f7f491f35280b77d2ff8f0ff0))
+
 ## [0.2.1](https://github.com/krezh/binix/compare/binix-token-0.2.0...binix-token-0.2.1) (2025-12-11)
 
 
