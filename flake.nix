@@ -98,7 +98,7 @@
             copyToRoot = [ self.packages.${system}.binixd ];
 
             config = {
-              Cmd = [ "${self.packages.${system}.binixd}/bin/binixd" ];
+              Entrypoint = [ "${self.packages.${system}.binixd}/bin/binixd" ];
               ExposedPorts = {
                 "8080/tcp" = { };
               };
