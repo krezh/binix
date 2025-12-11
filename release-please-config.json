@@ -10,13 +10,13 @@
       "component": "binix"
     },
     "client": {
-      "component": "client"
+      "component": "binix-client"
     },
     "server": {
-      "component": "server"
+      "component": "binix-server"
     },
     "token": {
-      "component": "token"
+      "component": "binix-token"
     }
   },
   "plugins": [
@@ -29,9 +29,9 @@
       "groupName": "binix",
       "components": [
         "binix",
-        "client",
-        "server",
-        "token"
+        "binix-client",
+        "binix-server",
+        "binix-token"
       ]
     }
   ],
