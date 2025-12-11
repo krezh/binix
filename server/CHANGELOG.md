@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.5](https://github.com/krezh/binix/compare/0.2.4...0.2.5) (2025-12-11)
+
+
+### Bug Fixes
+
+* maybe ([2432633](https://github.com/krezh/binix/commit/2432633d5317c09f7f491f35280b77d2ff8f0ff0))
+* test release-please with server change ([d444711](https://github.com/krezh/binix/commit/d444711fbeea3046b8551d803d203f7147de1147))
+* update route path parameters to Axum 0.8 syntax ([8afbdba](https://github.com/krezh/binix/commit/8afbdba2c6526617818131061821502357b1a397))
+
+
+### Miscellaneous Chores
+
+* release ([#6](https://github.com/krezh/binix/issues/6)) ([c1fdfe1](https://github.com/krezh/binix/commit/c1fdfe1ffd229f0e58d3f8be4d3834e4b1c64f30))
+* release ([#7](https://github.com/krezh/binix/issues/7)) ([055fef6](https://github.com/krezh/binix/commit/055fef68a79cd24d9c4a3f6805b9a1e64a691d6d))
+* release ([#9](https://github.com/krezh/binix/issues/9)) ([0105823](https://github.com/krezh/binix/commit/01058236c322c65496ed2f98c1fa651564894232))
+
 ## [0.2.4](https://github.com/krezh/binix/compare/0.2.3...0.2.4) (2025-12-11)
 
 
