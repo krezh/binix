@@ -132,3 +132,4 @@ fn dump_version() {
     #[cfg(not(debug_assertions))]
     eprintln!("Binix Server {} (release)", env!("CARGO_PKG_VERSION"));
 }
+// test comment
