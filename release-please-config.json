@@ -1,29 +1,40 @@
 {
-  "group-pull-request-title-pattern": "chore: release ${version}",
   "include-v-in-tag": false,
   "include-component-in-tag": false,
+  "release-type": "rust",
+  "exclude-paths": [
+    ".github/workflows"
+  ],
   "packages": {
     "binix": {
-      "release-type": "rust",
-      "package-name": "binix",
       "component": "binix"
     },
     "client": {
-      "release-type": "rust",
-      "package-name": "binix-client",
       "component": "binix-client"
     },
     "server": {
-      "release-type": "rust",
-      "package-name": "binix-server",
       "component": "binix-server"
     },
     "token": {
-      "release-type": "rust",
-      "package-name": "binix-token",
       "component": "binix-token"
     }
   },
+  "plugins": [
+    {
+      "type": "cargo-workspace",
+      "merge": false
+    },
+    {
+      "type": "linked-versions",
+      "groupName": "binix",
+      "components": [
+        "binix",
+        "binix-client",
+        "binix-server",
+        "binix-token"
+      ]
+    }
+  ],
   "changelog-sections": [
     {
       "type": "feat",

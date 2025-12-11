@@ -67,9 +67,9 @@ pub async fn run(opts: Opts) -> Result<()> {
         force_preamble: sub.force_preamble,
         use_client_chunking: false,
         chunking_nar_size_threshold: 128 * 1024, // 128 KiB
-        chunking_min_size: 16 * 1024 * 1024,     // 16 MiB
-        chunking_avg_size: 64 * 1024 * 1024,     // 64 MiB
-        chunking_max_size: 128 * 1024 * 1024,    // 128 MiB
+        chunking_min_size: 8 * 1024 * 1024,      // 8 MiB
+        chunking_avg_size: 32 * 1024 * 1024,     // 32 MiB
+        chunking_max_size: 64 * 1024 * 1024,     // 64 MiB
     };
 
     let push_session_config = PushSessionConfig {

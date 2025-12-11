@@ -48,11 +48,7 @@ pub struct Push {
     force_preamble: bool,
 
     /// Use client-side chunking to bypass upload size limits.
-    ///
-    /// This is useful when uploading through reverse proxies like
-    /// Cloudflare that impose file size limits. Each chunk is uploaded
-    /// separately, allowing large NARs to be uploaded successfully.
-    #[clap(long)]
+    #[clap(long, default_value = "false", action = clap::ArgAction::Set)]
     chunked: bool,
 
     /// Minimum NAR size to trigger chunking.
@@ -64,20 +60,20 @@ pub struct Push {
     /// Minimum chunk size.
     ///
     /// Supports human-readable sizes like "16MB", "64MiB", "1GB".
-    #[clap(long, default_value = "16MiB")]
+    #[clap(long, default_value = "8MiB")]
     chunking_min_size: String,
 
     /// Average chunk size.
     ///
     /// Supports human-readable sizes like "64MB", "128MiB", "1GB".
-    #[clap(long, default_value = "64MiB")]
+    #[clap(long, default_value = "32MiB")]
     chunking_avg_size: String,
 
     /// Maximum chunk size.
     ///
     /// Supports human-readable sizes like "128MB", "256MiB", "2GB".
     /// Keep this below your proxy's upload size limit (e.g., 100MB for Cloudflare free tier).
-    #[clap(long, default_value = "128MiB")]
+    #[clap(long, default_value = "64MiB")]
     chunking_max_size: String,
 }
 
