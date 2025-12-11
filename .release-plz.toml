@@ -9,7 +9,6 @@ publish = false
 
 [[package]] # the double square brackets define a TOML table array
 name = "binix"
-changelog_include = ["binix"] # include commits from `package_b` in the changelog
 
 [[package]]
 name = "binix-server"
