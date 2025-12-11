@@ -1,0 +1,21 @@
+[package]
+name = "binix-token"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+binix = { path = "../binix", default-features = false }
+
+base64 = "0.22.1"
+chrono = "0.4.41"
+displaydoc = "0.2.5"
+indexmap = { version = "2.10.0", features = ["serde"] }
+jwt-simple = { version = "0.12.0", default-features = false, features = ["pure-rust"] }
+lazy_static = "1.5.0"
+regex = "1.11.1"
+serde = "1.0.219"
+serde_with = "3.14.0"
+tracing = "0.1.41"
+rsa = "0.9.8"

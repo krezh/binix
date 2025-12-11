@@ -1,0 +1,11 @@
+# Changelog
+
+## [0.2.0](https://github.com/krezh/binix/compare/binix-server-v0.1.0...binix-server-v0.2.0) (2025-12-10)
+
+
+### Features
+
+* **cargo:** update axum monorepo ([#21](https://github.com/krezh/binix/issues/21)) ([5950a5d](https://github.com/krezh/binix/commit/5950a5d4f22bb9aaa8e831a5d143c0a4448c350c))
+* **cargo:** update console-subscriber ( 0.2.0 → 0.5.0 ) ([#23](https://github.com/krezh/binix/issues/23)) ([c10a481](https://github.com/krezh/binix/commit/c10a481d7fe6c818b779f1973d7f597bffac72aa))
+* **cargo:** update rand ( 0.8.5 → 0.9.2 ) ([#32](https://github.com/krezh/binix/issues/32)) ([92ad8ee](https://github.com/krezh/binix/commit/92ad8ee59a1ed7ee400f4e084b73bfd44a9cc576))
+* **cargo:** update tower-http ( 0.5.2 → 0.6.8 ) ([#38](https://github.com/krezh/binix/issues/38)) ([8543b1c](https://github.com/krezh/binix/commit/8543b1c88ed3af380e59cef5e5ca47ab7e02f8c5))

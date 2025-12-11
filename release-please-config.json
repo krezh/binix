@@ -1,0 +1,82 @@
+{
+  "group-pull-request-title-pattern": "chore: release ${version}",
+  "include-v-in-tag": false,
+  "include-component-in-tag": false,
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "binix",
+      "component": "binix"
+    },
+    "binix": {
+      "release-type": "rust",
+      "package-name": "binix",
+      "component": "binix"
+    },
+    "client": {
+      "release-type": "rust",
+      "package-name": "binix-client",
+      "component": "binix-client"
+    },
+    "server": {
+      "release-type": "rust",
+      "package-name": "binix-server",
+      "component": "binix-server"
+    },
+    "token": {
+      "release-type": "rust",
+      "package-name": "binix-token",
+      "component": "binix-token"
+    }
+  },
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bug Fixes"
+    },
+    {
+      "type": "perf",
+      "section": "Performance Improvements"
+    },
+    {
+      "type": "deps",
+      "section": "Dependencies"
+    },
+    {
+      "type": "revert",
+      "section": "Reverts"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "style",
+      "section": "Styles"
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous Chores"
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring"
+    },
+    {
+      "type": "test",
+      "section": "Tests"
+    },
+    {
+      "type": "build",
+      "section": "Build System"
+    },
+    {
+      "type": "ci",
+      "section": "Continuous Integration"
+    }
+  ]
+}
