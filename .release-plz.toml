@@ -1,0 +1,23 @@
+[workspace]
+changelog_update = true
+dependencies_update = false # update dependencies with `cargo update`
+git_release_enable = true
+pr_branch_prefix = "release-plz-" # PR branch prefix
+pr_labels = ["release"] # add the `release` label to the release Pull Request
+semver_check = true
+
+[[package]] # the double square brackets define a TOML table array
+name = "binix"
+changelog_include = ["binix"] # include commits from `package_b` in the changelog
+
+[[package]]
+name = "server"
+
+[[package]]
+name = "client"
+
+[[package]]
+name = "token"
+
+[changelog]
+protect_breaking_commits = true # always include commits with breaking changes in the changelog
