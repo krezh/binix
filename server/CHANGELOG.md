@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/krezh/binix/compare/0.2.3...0.2.4) (2025-12-11)
+
+
+### Bug Fixes
+
+* test release-please with server change ([d444711](https://github.com/krezh/binix/commit/d444711fbeea3046b8551d803d203f7147de1147))
+
 ## [0.2.3](https://github.com/krezh/binix/compare/0.2.2...0.2.3) (2025-12-11)
 
 
