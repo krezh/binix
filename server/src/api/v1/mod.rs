@@ -18,23 +18,23 @@ pub(crate) fn get_router() -> Router {
         .route("/_api/v1/upload-chunk", put(upload_chunk::upload_chunk))
         .route("/_api/v1/finalize-nar", post(upload_chunk::finalize_nar))
         .route(
-            "/:cache/binix-cache-info",
+            "/{cache}/binix-cache-info",
             get(cache_config::get_cache_config),
         )
         .route(
-            "/_api/v1/cache-config/:cache",
+            "/_api/v1/cache-config/{cache}",
             get(cache_config::get_cache_config),
         )
         .route(
-            "/_api/v1/cache-config/:cache",
+            "/_api/v1/cache-config/{cache}",
             post(cache_config::create_cache),
         )
         .route(
-            "/_api/v1/cache-config/:cache",
+            "/_api/v1/cache-config/{cache}",
             patch(cache_config::configure_cache),
         )
         .route(
-            "/_api/v1/cache-config/:cache",
+            "/_api/v1/cache-config/{cache}",
             delete(cache_config::destroy_cache),
         )
 }
