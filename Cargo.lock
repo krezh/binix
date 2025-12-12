@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "binix"
-version = "0.2.3"
+version = "0.1.0"
 dependencies = [
  "async-stream",
  "base64 0.22.1",
@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "binix-client"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -838,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "binix-server"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -889,7 +889,7 @@ dependencies = [
 
 [[package]]
 name = "binix-token"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "base64 0.22.1",
  "binix",
