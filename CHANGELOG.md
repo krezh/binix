@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.31](https://github.com/krezh/binix/compare/v0.2.30...v0.2.31) (2025-12-12)
+
+
+### Bug Fixes
+
+* revert ([585bf1f](https://github.com/krezh/binix/commit/585bf1fd748df79ccbe72c0ba4d080947c66cce5))
+
 ## [0.2.30](https://github.com/krezh/binix/compare/v0.2.29...v0.2.30) (2025-12-12)
 
 
