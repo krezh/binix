@@ -1,14 +1,14 @@
 {
+  "release-type": "rust",
+  "include-component-in-tag": false,
+  "plugins": [
+    "cargo-workspace"
+  ],
+  "exclude-paths": [
+    ".github/workflows"
+  ],
   "packages": {
     ".": {
-      "release-type": "rust",
-      "include-component-in-tag": false,
-      "plugins": [
-        "cargo-workspace"
-      ],
-      "exclude-paths": [
-        ".github/workflows"
-      ],
       "extra-files": [],
       "changelog-sections": [
         {
