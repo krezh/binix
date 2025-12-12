@@ -2,6 +2,8 @@ name: Test
 
 on:
   pull_request:
+    paths-ignore:
+      - .github
   push:
     paths-ignore:
       - .github
