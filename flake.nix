@@ -93,13 +93,21 @@
           docker-image = pkgs.dockerTools.buildImage {
             name = "binixd";
             tag = version;
-            copyToRoot = [ self.packages.${system}.binixd ];
+            copyToRoot = [
+              self.packages.${system}.binixd
+              pkgs.cacert
+              pkgs.busybox
+              pkgs.dockerTools.fakeNss
+            ];
 
             config = {
               Entrypoint = [ "${self.packages.${system}.binixd}/bin/binixd" ];
               ExposedPorts = {
                 "8080/tcp" = { };
               };
+              Env = [
+                "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+              ];
             };
           };
         };
