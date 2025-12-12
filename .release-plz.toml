@@ -6,6 +6,3 @@ pr_branch_prefix = "release-plz-" # PR branch prefix
 pr_labels = ["release"] # add the `release` label to the release Pull Request
 semver_check = true
 publish = false
-
-[changelog]
-protect_breaking_commits = true # always include commits with breaking changes in the changelog
