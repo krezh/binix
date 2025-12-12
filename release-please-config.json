@@ -2,7 +2,20 @@
   "release-type": "rust",
   "include-component-in-tag": false,
   "plugins": [
-    "cargo-workspace"
+    {
+      "type": "cargo-workspace",
+      "merge": false
+    },
+    {
+      "type": "linked-versions",
+      "groupName": "binix",
+      "components": [
+        "binix",
+        "binix-server",
+        "binix-client",
+        "binix-token"
+      ]
+    }
   ],
   "exclude-paths": [
     ".github/workflows"
