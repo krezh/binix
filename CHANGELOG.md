@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.29](https://github.com/krezh/binix/compare/v0.2.28...v0.2.29) (2025-12-12)
+
+
+### Miscellaneous Chores
+
+* **nix:** lock file maintenance ([#15](https://github.com/krezh/binix/issues/15)) ([9045540](https://github.com/krezh/binix/commit/90455400eb2f82095bbbf790db901b39e53bf757))
+
 ## [0.2.28](https://github.com/krezh/binix/compare/v0.2.27...v0.2.28) (2025-12-12)
 
 
