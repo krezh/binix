@@ -63,10 +63,8 @@
           sqlite-interactive
           jq
         ];
-
-        # Read version from release-please manifest
-        version = (builtins.fromJSON (builtins.readFile ./.release-please-manifest.json)).server;
-
+        releaseManifest = builtins.fromJSON (builtins.readFile ./.release-please-manifest.json);
+        version = releaseManifest.".";
       in
       {
         packages = {

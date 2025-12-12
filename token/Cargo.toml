@@ -1,6 +1,6 @@
 [package]
 name = "binix-token"
-version = "0.2.7"
+version = { workspace = true }
 edition = "2021"
 publish = false
 

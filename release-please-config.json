@@ -1,79 +1,67 @@
 {
-  "release-type": "rust",
-  "include-component-in-tag": false,
-  "plugins": [
-    {
-      "type": "cargo-workspace",
-      "merge": false
-    },
-    {
-      "type": "linked-versions",
-      "groupName": "binix",
-      "components": [
-        "binix",
-        "binix-server",
-        "binix-client",
-        "binix-token"
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "exclude-paths": [
+        ".github",
+        ".cargo",
+        "release-please",
+        ".gitignore",
+        "renovate.json"
       ]
     }
-  ],
-  "exclude-paths": [
-    ".github/workflows"
-  ],
-  "packages": {
-    "binix": {},
-    "binix-server": {},
-    "binix-client": {},
-    "binix-token": {}
   },
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "include-component-in-tag": false,
+  "extra-files": [
+    {
+      "type": "toml",
+      "path": "Cargo.toml",
+      "jsonpath": "$.workspace.package.version"
+    },
+    {
+      "type": "toml",
+      "path": "Cargo.lock",
+      "jsonpath": "$.package[?(@.name.value == \"binix\")].version"
+    },
+    {
+      "type": "toml",
+      "path": "Cargo.lock",
+      "jsonpath": "$.package[?(@.name.value == \"binix-server\")].version"
+    },
+    {
+      "type": "toml",
+      "path": "Cargo.lock",
+      "jsonpath": "$.package[?(@.name.value == \"binix-client\")].version"
+    },
+    {
+      "type": "toml",
+      "path": "Cargo.lock",
+      "jsonpath": "$.package[?(@.name.value == \"binix-token\")].version"
+    }
+  ],
   "changelog-sections": [
     {
       "type": "feat",
+      "hidden": false,
       "section": "Features"
     },
     {
       "type": "fix",
+      "hidden": false,
       "section": "Bug Fixes"
     },
     {
-      "type": "perf",
-      "section": "Performance Improvements"
-    },
-    {
-      "type": "deps",
-      "section": "Dependencies"
-    },
-    {
-      "type": "revert",
-      "section": "Reverts"
-    },
-    {
       "type": "docs",
+      "hidden": false,
       "section": "Documentation"
     },
     {
-      "type": "style",
-      "section": "Styles"
-    },
-    {
       "type": "chore",
+      "hidden": false,
       "section": "Miscellaneous Chores"
-    },
-    {
-      "type": "refactor",
-      "section": "Code Refactoring"
-    },
-    {
-      "type": "test",
-      "section": "Tests"
-    },
-    {
-      "type": "build",
-      "section": "Build System"
-    },
-    {
-      "type": "ci",
-      "section": "Continuous Integration"
     }
-  ]
+  ],
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json"
 }
