@@ -37,7 +37,7 @@ jobs:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
           gc-max-store-size-linux: 1G
-          purge: trued
+          purge: true
           purge-prefixes: nix-${{ runner.os }}-
           purge-created: 0
           purge-last-accessed: 0
@@ -52,11 +52,11 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         run: |
           nix build .#docker-image
           docker load < result
-          docker tag binixd:v${{ steps.version.outputs.version }} ghcr.io/${{ github.repository_owner }}/binixd:v${{ steps.version.outputs.version }}
-          docker push ghcr.io/${{ github.repository_owner }}/binixd:v${{ steps.version.outputs.version }}
+          docker tag binixd:${{ steps.version.outputs.version }} ghcr.io/${{ github.repository_owner }}/binixd:${{ steps.version.outputs.version }}
+          docker push ghcr.io/${{ github.repository_owner }}/binixd:${{ steps.version.outputs.version }}
