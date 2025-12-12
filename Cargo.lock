@@ -199,9 +199,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.88"
+version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
+checksum = "9035ad2d096bed7955a320ee7e2230574d28fd3c3a0f186cbea1ff3c7eed5dbb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -222,136 +222,6 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
-
-[[package]]
-name = "attic"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "base64 0.22.1",
- "bytes",
- "cc",
- "criterion",
- "cxx",
- "cxx-build",
- "digest",
- "displaydoc",
- "ed25519-compact",
- "fastcdc",
- "futures",
- "hex",
- "lazy_static",
- "nix-base32",
- "pin-project",
- "regex",
- "serde",
- "serde_json",
- "serde_with",
- "sha2",
- "system-deps",
- "tempfile",
- "tokio",
- "version-compare",
- "wildmatch",
-]
-
-[[package]]
-name = "attic-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-channel",
- "attic",
- "bytes",
- "clap",
- "clap_complete",
- "const_format",
- "dialoguer",
- "displaydoc",
- "enum-as-inner",
- "futures",
- "humantime",
- "indicatif",
- "lazy_static",
- "notify",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
- "xdg",
-]
-
-[[package]]
-name = "attic-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-compression",
- "async-stream",
- "async-trait",
- "attic",
- "attic-token",
- "aws-config",
- "aws-sdk-s3",
- "axum 0.7.9",
- "axum-macros",
- "base64 0.22.1",
- "bytes",
- "chrono",
- "clap",
- "console-subscriber",
- "derive_more",
- "digest",
- "displaydoc",
- "enum-as-inner",
- "futures",
- "hex",
- "http-body-util",
- "humantime",
- "humantime-serde",
- "itoa",
- "rand 0.8.5",
- "regex",
- "rsa 0.9.8",
- "ryu",
- "sea-orm",
- "sea-orm-migration",
- "serde",
- "serde_json",
- "serde_with",
- "sha2",
- "tokio",
- "tokio-util",
- "toml",
- "tower-http 0.5.2",
- "tracing",
- "tracing-error",
- "tracing-subscriber",
- "uuid",
- "xdg",
-]
-
-[[package]]
-name = "attic-token"
-version = "0.1.0"
-dependencies = [
- "attic",
- "base64 0.22.1",
- "chrono",
- "displaydoc",
- "indexmap 2.10.0",
- "jwt-simple",
- "lazy_static",
- "regex",
- "rsa 0.9.8",
- "serde",
- "serde_with",
- "tracing",
-]
 
 [[package]]
 name = "autocfg"
@@ -989,6 +859,136 @@ dependencies = [
  "shlex",
  "syn 2.0.104",
  "which",
+]
+
+[[package]]
+name = "binix"
+version = "0.2.31"
+dependencies = [
+ "async-stream",
+ "base64 0.22.1",
+ "bytes",
+ "cc",
+ "criterion",
+ "cxx",
+ "cxx-build",
+ "digest",
+ "displaydoc",
+ "ed25519-compact",
+ "fastcdc",
+ "futures",
+ "hex",
+ "lazy_static",
+ "nix-base32",
+ "pin-project",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "system-deps",
+ "tempfile",
+ "tokio",
+ "version-compare",
+ "wildmatch",
+]
+
+[[package]]
+name = "binix-client"
+version = "0.2.31"
+dependencies = [
+ "anyhow",
+ "async-channel",
+ "binix",
+ "bytes",
+ "clap",
+ "clap_complete",
+ "const_format",
+ "dialoguer",
+ "displaydoc",
+ "enum-as-inner",
+ "futures",
+ "humantime",
+ "indicatif",
+ "lazy_static",
+ "notify",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "xdg",
+]
+
+[[package]]
+name = "binix-server"
+version = "0.2.31"
+dependencies = [
+ "anyhow",
+ "async-compression",
+ "async-stream",
+ "async-trait",
+ "aws-config",
+ "aws-sdk-s3",
+ "axum 0.7.9",
+ "axum-macros",
+ "base64 0.22.1",
+ "binix",
+ "binix-token",
+ "bytes",
+ "chrono",
+ "clap",
+ "console-subscriber",
+ "derive_more",
+ "digest",
+ "displaydoc",
+ "enum-as-inner",
+ "futures",
+ "hex",
+ "http-body-util",
+ "humantime",
+ "humantime-serde",
+ "itoa",
+ "rand 0.8.5",
+ "regex",
+ "rsa 0.9.8",
+ "ryu",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
+ "uuid",
+ "xdg",
+]
+
+[[package]]
+name = "binix-token"
+version = "0.2.31"
+dependencies = [
+ "base64 0.22.1",
+ "binix",
+ "chrono",
+ "displaydoc",
+ "indexmap 2.10.0",
+ "jwt-simple",
+ "lazy_static",
+ "regex",
+ "rsa 0.9.8",
+ "serde",
+ "serde_with",
+ "tracing",
 ]
 
 [[package]]
