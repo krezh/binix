@@ -19,15 +19,10 @@ use crate::config::ServerConfig;
 use crate::version::BINIX_DISTRIBUTOR;
 use binix::api::v1::cache_config::{CacheConfig, CreateCacheRequest};
 use binix::api::v1::get_missing_paths::{GetMissingPathsRequest, GetMissingPathsResponse};
-use binix::api::v1::upload_chunk::{
-    FinalizeNarRequest, FinalizeNarResponse, UploadChunkResponse, BINIX_CHUNK_HASH,
-    BINIX_CHUNK_SIZE,
-};
 use binix::api::v1::upload_path::{
     UploadPathNarInfo, UploadPathResult, BINIX_NAR_INFO, BINIX_NAR_INFO_PREAMBLE_SIZE,
 };
 use binix::cache::CacheName;
-use binix::hash::Hash;
 use binix::nix_store::StorePathHash;
 
 /// The User-Agent string of Binix.
@@ -214,65 +209,6 @@ impl ApiClient {
                 Ok(r) => Ok(Some(r)),
                 Err(_) => Ok(None),
             }
-        } else {
-            let api_error = ApiError::try_from_response(res).await?;
-            Err(api_error.into())
-        }
-    }
-
-    /// Uploads a single chunk.
-    pub async fn upload_chunk<S>(
-        &self,
-        chunk_hash: &Hash,
-        chunk_size: usize,
-        stream: S,
-    ) -> Result<UploadChunkResponse>
-    where
-        S: TryStream<Ok = Bytes> + Send + Sync + 'static,
-        S::Error: Into<Box<dyn StdError + Send + Sync>> + Send + Sync,
-    {
-        let endpoint = self.endpoint.join("_api/v1/upload-chunk")?;
-
-        let req = self
-            .client
-            .put(endpoint)
-            .header(USER_AGENT, HeaderValue::from_str(BINIX_USER_AGENT)?)
-            .header(
-                BINIX_CHUNK_HASH,
-                HeaderValue::from_str(&chunk_hash.to_typed_base16())?,
-            )
-            .header(
-                BINIX_CHUNK_SIZE,
-                HeaderValue::from_str(&chunk_size.to_string())?,
-            )
-            .body(Body::wrap_stream(stream));
-
-        let res = req.send().await?;
-
-        if res.status().is_success() {
-            let response = res.json().await?;
-            Ok(response)
-        } else {
-            let api_error = ApiError::try_from_response(res).await?;
-            Err(api_error.into())
-        }
-    }
-
-    /// Finalizes a chunked NAR upload.
-    pub async fn finalize_nar(&self, request: FinalizeNarRequest) -> Result<FinalizeNarResponse> {
-        let endpoint = self.endpoint.join("_api/v1/finalize-nar")?;
-
-        let req = self
-            .client
-            .post(endpoint)
-            .header(USER_AGENT, HeaderValue::from_str(BINIX_USER_AGENT)?)
-            .json(&request);
-
-        let res = req.send().await?;
-
-        if res.status().is_success() {
-            let response = res.json().await?;
-            Ok(response)
         } else {
             let api_error = ApiError::try_from_response(res).await?;
             Err(api_error.into())

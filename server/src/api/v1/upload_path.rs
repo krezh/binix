@@ -5,6 +5,7 @@ use std::marker::Unpin;
 use std::sync::Arc;
 
 use anyhow::anyhow;
+use async_compression::tokio::bufread::{BrotliEncoder, XzEncoder, ZstdEncoder};
 use async_compression::Level as CompressionLevel;
 use axum::{
     body::Body,
@@ -27,7 +28,7 @@ use tokio_util::io::StreamReader;
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::compression::{get_compressor_fn, CompressionStream};
+use crate::compression::{CompressionStream, CompressorFn};
 use crate::config::CompressionType;
 use crate::error::{ErrorKind, ServerError, ServerResult};
 use crate::narinfo::Compression;
@@ -731,6 +732,20 @@ async fn upload_chunk(
 }
 
 /// Returns a compressor function that takes some stream as input.
+fn get_compressor_fn<C: AsyncBufRead + Unpin + Send + 'static>(
+    ctype: CompressionType,
+    level: CompressionLevel,
+) -> CompressorFn<C> {
+    match ctype {
+        CompressionType::None => Box::new(|c| Box::new(c)),
+        CompressionType::Brotli => {
+            Box::new(move |s| Box::new(BrotliEncoder::with_quality(s, level)))
+        }
+        CompressionType::Zstd => Box::new(move |s| Box::new(ZstdEncoder::with_quality(s, level))),
+        CompressionType::Xz => Box::new(move |s| Box::new(XzEncoder::with_quality(s, level))),
+    }
+}
+
 impl ChunkData {
     /// Returns the potentially-incorrect hash of the chunk.
     fn hash(&self) -> Hash {

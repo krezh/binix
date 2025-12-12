@@ -92,7 +92,7 @@ impl S3Backend {
     }
 
     async fn config_builder(config: &S3StorageConfig) -> ServerResult<S3ConfigBuilder> {
-        let shared_config = aws_config::load_defaults(BehaviorVersion::v2025_08_07()).await;
+        let shared_config = aws_config::load_defaults(BehaviorVersion::v2025_01_17()).await;
         let mut builder = S3ConfigBuilder::from(&shared_config);
 
         if let Some(credentials) = &config.credentials {
@@ -341,6 +341,16 @@ impl StorageBackend for S3Backend {
         tracing::debug!("delete_file -> {:#?}", deletion);
 
         Ok(())
+    }
+
+    async fn download_file(&self, name: String, prefer_stream: bool) -> ServerResult<Download> {
+        let req = self
+            .client
+            .get_object()
+            .bucket(&self.config.bucket)
+            .key(&name);
+
+        self.get_download(req, prefer_stream).await
     }
 
     async fn download_file_db(

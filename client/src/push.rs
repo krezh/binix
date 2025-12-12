@@ -34,15 +34,10 @@ use tokio::time;
 
 use crate::api::ApiClient;
 use binix::api::v1::cache_config::CacheConfig;
-use binix::api::v1::upload_chunk::FinalizeNarRequest;
 use binix::api::v1::upload_path::{UploadPathNarInfo, UploadPathResult, UploadPathResultKind};
 use binix::cache::CacheName;
-use binix::chunking::chunk_stream;
 use binix::error::BinixResult;
-use binix::hash::Hash;
 use binix::nix_store::{NixStore, StorePath, StorePathHash, ValidPathInfo};
-use sha2::{Digest, Sha256};
-use std::io::Cursor;
 
 type JobSender = channel::Sender<ValidPathInfo>;
 type JobReceiver = channel::Receiver<ValidPathInfo>;
@@ -55,21 +50,6 @@ pub struct PushConfig {
 
     /// Whether to always include the upload info in the PUT payload.
     pub force_preamble: bool,
-
-    /// Whether to use client-side chunking.
-    pub use_client_chunking: bool,
-
-    /// Minimum NAR size to trigger chunking (bytes).
-    pub chunking_nar_size_threshold: usize,
-
-    /// Minimum chunk size (bytes).
-    pub chunking_min_size: usize,
-
-    /// Average chunk size (bytes).
-    pub chunking_avg_size: usize,
-
-    /// Maximum chunk size (bytes).
-    pub chunking_max_size: usize,
 }
 
 /// Configuration for a push session.
@@ -266,29 +246,15 @@ impl Pusher {
 
             let store_path = path_info.path.clone();
 
-            let r = if config.use_client_chunking
-                && path_info.nar_size as usize >= config.chunking_nar_size_threshold
-            {
-                upload_path_chunked(
-                    path_info,
-                    store.clone(),
-                    api.clone(),
-                    &cache,
-                    mp.clone(),
-                    &config,
-                )
-                .await
-            } else {
-                upload_path(
-                    path_info,
-                    store.clone(),
-                    api.clone(),
-                    &cache,
-                    mp.clone(),
-                    config.force_preamble,
-                )
-                .await
-            };
+            let r = upload_path(
+                path_info,
+                store.clone(),
+                api.clone(),
+                &cache,
+                mp.clone(),
+                config.force_preamble,
+            )
+            .await;
 
             results.insert(store_path, r);
         }
@@ -530,179 +496,6 @@ impl PushPlan {
 }
 
 /// Uploads a single path to a cache.
-/// Uploads a path using client-side chunking.
-///
-/// This splits the NAR into chunks before uploading, allowing bypassing
-/// of size limits imposed by reverse proxies like Cloudflare.
-pub async fn upload_path_chunked(
-    path_info: ValidPathInfo,
-    store: Arc<NixStore>,
-    api: ApiClient,
-    cache: &CacheName,
-    mp: MultiProgress,
-    config: &PushConfig,
-) -> Result<()> {
-    let path = &path_info.path;
-
-    let template = format!(
-        "{{spinner}} {: <20.20} {{bar:40.green/blue}} {{human_bytes:10}} ({{average_speed}})",
-        path.name(),
-    );
-    let style = ProgressStyle::with_template(&template)
-        .unwrap()
-        .tick_chars("🕛🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚✅")
-        .progress_chars("██ ")
-        .with_key("human_bytes", |state: &ProgressState, w: &mut dyn Write| {
-            write!(w, "{}", HumanBytes(state.pos())).unwrap();
-        })
-        .with_key(
-            "average_speed",
-            |state: &ProgressState, w: &mut dyn Write| match (state.pos(), state.elapsed()) {
-                (pos, elapsed) if elapsed > Duration::ZERO => {
-                    write!(w, "{}", average_speed(pos, elapsed)).unwrap();
-                }
-                _ => write!(w, "-").unwrap(),
-            },
-        );
-    let bar = mp.add(ProgressBar::new(path_info.nar_size));
-    bar.set_style(style);
-
-    let start = Instant::now();
-
-    // Read the entire NAR into memory first
-    // TODO: Stream chunking for very large NARs
-    let nar_data = {
-        let mut nar_stream = store.nar_from_path(path.to_owned());
-        let mut data = Vec::new();
-        while let Some(chunk_result) = nar_stream.try_next().await? {
-            data.extend_from_slice(&chunk_result);
-            bar.inc(chunk_result.len() as u64);
-        }
-        data
-    };
-
-    // Verify NAR hash while we have it in memory
-    let mut hasher = Sha256::new();
-    hasher.update(&nar_data);
-    let computed_hash = Hash::Sha256(hasher.finalize().as_slice().try_into().unwrap());
-
-    if computed_hash != path_info.nar_hash {
-        return Err(anyhow!("NAR hash mismatch"));
-    }
-
-    bar.set_position(0);
-
-    // Chunk the NAR
-    let cursor = Cursor::new(&nar_data);
-    let mut chunks = chunk_stream(
-        cursor,
-        config.chunking_min_size,
-        config.chunking_avg_size,
-        config.chunking_max_size,
-    );
-
-    let mut chunk_hashes = Vec::new();
-    let mut upload_tasks = Vec::new();
-
-    // Upload chunks concurrently
-    while let Some(chunk_bytes) = chunks.try_next().await? {
-        // Compute chunk hash
-        let mut hasher = Sha256::new();
-        hasher.update(&chunk_bytes);
-        let chunk_hash = Hash::Sha256(hasher.finalize().as_slice().try_into().unwrap());
-        let chunk_size = chunk_bytes.len();
-
-        chunk_hashes.push(chunk_hash.clone());
-
-        let api = api.clone();
-        let bar = bar.clone();
-
-        let task = spawn(async move {
-            let stream =
-                futures::stream::once(async move { Ok::<Bytes, anyhow::Error>(chunk_bytes) });
-            let result = api.upload_chunk(&chunk_hash, chunk_size, stream).await?;
-            bar.inc(chunk_size as u64);
-            Ok::<_, anyhow::Error>(result)
-        });
-
-        upload_tasks.push(task);
-    }
-
-    // Wait for all chunks to upload
-    let results = join_all(upload_tasks).await;
-
-    let mut num_deduplicated = 0;
-    for result in results {
-        let upload_result = result??;
-        if upload_result.deduplicated {
-            num_deduplicated += 1;
-        }
-    }
-
-    // Finalize the NAR
-    let full_path = store
-        .get_full_path(path)
-        .to_str()
-        .ok_or_else(|| anyhow!("Path contains non-UTF-8"))?
-        .to_string();
-
-    let references = path_info
-        .references
-        .into_iter()
-        .map(|pb| {
-            pb.to_str()
-                .ok_or_else(|| anyhow!("Reference contains non-UTF-8"))
-                .map(|s| s.to_owned())
-        })
-        .collect::<Result<Vec<String>, anyhow::Error>>()?;
-
-    let num_chunks = chunk_hashes.len();
-
-    let finalize_request = FinalizeNarRequest {
-        cache: cache.to_owned(),
-        store_path_hash: path.to_hash().to_string(),
-        store_path: full_path,
-        references,
-        system: None,
-        deriver: None,
-        sigs: path_info.sigs,
-        ca: path_info.ca,
-        nar_hash: path_info.nar_hash.to_owned(),
-        nar_size: path_info.nar_size as usize,
-        chunk_hashes,
-    };
-
-    let finalize_result = api.finalize_nar(finalize_request).await?;
-
-    let elapsed = start.elapsed();
-    let seconds = elapsed.as_secs_f64();
-    let speed = (path_info.nar_size as f64 / seconds) as u64;
-
-    let mut info_string = format!("{}/s", HumanBytes(speed));
-
-    if let Some(frac_deduplicated) = finalize_result.frac_deduplicated {
-        if frac_deduplicated > 0.01f64 {
-            info_string += &format!(", {:.1}% deduplicated", frac_deduplicated * 100.0);
-        }
-    } else if num_deduplicated > 0 {
-        let frac = num_deduplicated as f64 / num_chunks as f64;
-        if frac > 0.01f64 {
-            info_string += &format!(", {:.1}% deduplicated", frac * 100.0);
-        }
-    }
-
-    mp.suspend(|| {
-        eprintln!(
-            "✅ {} (chunked, {})",
-            path.as_os_str().to_string_lossy(),
-            info_string
-        );
-    });
-    bar.finish_and_clear();
-
-    Ok(())
-}
-
 pub async fn upload_path(
     path_info: ValidPathInfo,
     store: Arc<NixStore>,

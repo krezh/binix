@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
 
 use binix::chunking::chunk_stream;
@@ -57,7 +57,7 @@ pub fn bench_chunking(c: &mut Criterion) {
                     params.max_size as usize,
                 );
                 while let Some(chunk) = chunks.next().await {
-                    std::hint::black_box(chunk).unwrap();
+                    black_box(chunk).unwrap();
                 }
             })
         });
@@ -72,7 +72,7 @@ pub fn bench_chunking(c: &mut Criterion) {
                 );
                 let mut chunks = Box::pin(chunks.as_stream());
                 while let Some(chunk) = chunks.next().await {
-                    std::hint::black_box(chunk).unwrap();
+                    black_box(chunk).unwrap();
                 }
             })
         });

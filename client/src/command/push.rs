@@ -12,7 +12,6 @@ use crate::cache::{CacheName, CacheRef, ServerName};
 use crate::cli::Opts;
 use crate::config::Config;
 use crate::push::{PushConfig, PushSessionConfig, Pusher};
-use crate::size_parser::parse_size;
 use binix::nix_store::NixStore;
 
 /// Push closures to a binary cache.
@@ -46,35 +45,6 @@ pub struct Push {
     /// Always send the upload info as part of the payload.
     #[clap(long, hide = true)]
     force_preamble: bool,
-
-    /// Use client-side chunking to bypass upload size limits.
-    #[clap(long, default_value = "false", action = clap::ArgAction::Set)]
-    chunked: bool,
-
-    /// Minimum NAR size to trigger chunking.
-    ///
-    /// Supports human-readable sizes like "128KB", "1MB", "64MiB".
-    #[clap(long, default_value = "128KiB")]
-    chunking_nar_size_threshold: String,
-
-    /// Minimum chunk size.
-    ///
-    /// Supports human-readable sizes like "16MB", "64MiB", "1GB".
-    #[clap(long, default_value = "8MiB")]
-    chunking_min_size: String,
-
-    /// Average chunk size.
-    ///
-    /// Supports human-readable sizes like "64MB", "128MiB", "1GB".
-    #[clap(long, default_value = "32MiB")]
-    chunking_avg_size: String,
-
-    /// Maximum chunk size.
-    ///
-    /// Supports human-readable sizes like "128MB", "256MiB", "2GB".
-    /// Keep this below your proxy's upload size limit (e.g., 100MB for Cloudflare free tier).
-    #[clap(long, default_value = "64MiB")]
-    chunking_max_size: String,
 }
 
 struct PushContext {
@@ -189,11 +159,6 @@ pub async fn run(opts: Opts) -> Result<()> {
     let push_config = PushConfig {
         num_workers: sub.jobs,
         force_preamble: sub.force_preamble,
-        use_client_chunking: sub.chunked,
-        chunking_nar_size_threshold: parse_size(&sub.chunking_nar_size_threshold)?,
-        chunking_min_size: parse_size(&sub.chunking_min_size)?,
-        chunking_avg_size: parse_size(&sub.chunking_avg_size)?,
-        chunking_max_size: parse_size(&sub.chunking_max_size)?,
     };
 
     let mp = MultiProgress::new();

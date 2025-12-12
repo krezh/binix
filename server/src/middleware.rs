@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use axum::{
-    extract::{Extension, Request},
+    extract::{Extension, Host, Request},
     http::HeaderValue,
     middleware::Next,
     response::Response,
@@ -16,16 +16,10 @@ use binix::api::binary_cache::BINIX_CACHE_VISIBILITY;
 /// Initializes per-request state.
 pub async fn init_request_state(
     Extension(state): Extension<State>,
+    Host(host): Host,
     mut req: Request,
     next: Next,
 ) -> Response {
-    let host = req
-        .headers()
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("localhost")
-        .to_string();
-
     // X-Forwarded-Proto is an untrusted header
     let client_claims_https =
         if let Some(x_forwarded_proto) = req.headers().get("x-forwarded-proto") {
@@ -53,15 +47,10 @@ pub async fn init_request_state(
 /// the first place.
 pub async fn restrict_host(
     Extension(state): Extension<State>,
+    Host(host): Host,
     req: Request,
     next: Next,
 ) -> ServerResult<Response> {
-    let host = req
-        .headers()
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| ErrorKind::RequestError(anyhow!("Missing Host header")))?;
-
     let allowed_hosts = &state.config.allowed_hosts;
 
     if !allowed_hosts.is_empty() && !allowed_hosts.iter().any(|h| h.as_str() == host) {

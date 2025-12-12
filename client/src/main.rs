@@ -21,7 +21,6 @@ mod config;
 mod nix_config;
 mod nix_netrc;
 mod push;
-mod size_parser;
 mod version;
 
 use anyhow::Result;

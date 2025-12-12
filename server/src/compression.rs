@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use async_compression::tokio::bufread::{BrotliEncoder, XzEncoder, ZstdEncoder};
-use async_compression::Level as CompressionLevel;
 use digest::Output as DigestOutput;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufRead, AsyncRead};
 use tokio::sync::OnceCell;
 
-use crate::config::CompressionType;
 use binix::io::HashReader;
 
 pub type CompressorFn<C> = Box<dyn FnOnce(C) -> Box<dyn AsyncRead + Unpin + Send> + Send>;
@@ -80,20 +77,5 @@ impl CompressionStream {
     /// Otherwise, returns `None`.
     pub fn file_hash_and_size(&self) -> Option<&(DigestOutput<Sha256>, usize)> {
         self.file_compute.get()
-    }
-}
-
-/// Creates a compressor function based on compression type and level.
-pub fn get_compressor_fn<C: AsyncBufRead + Unpin + Send + 'static>(
-    ctype: CompressionType,
-    level: CompressionLevel,
-) -> CompressorFn<C> {
-    match ctype {
-        CompressionType::None => Box::new(|c| Box::new(c)),
-        CompressionType::Brotli => {
-            Box::new(move |s| Box::new(BrotliEncoder::with_quality(s, level)))
-        }
-        CompressionType::Zstd => Box::new(move |s| Box::new(ZstdEncoder::with_quality(s, level))),
-        CompressionType::Xz => Box::new(move |s| Box::new(XzEncoder::with_quality(s, level))),
     }
 }
