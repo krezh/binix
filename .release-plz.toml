@@ -7,17 +7,5 @@ pr_labels = ["release"] # add the `release` label to the release Pull Request
 semver_check = true
 publish = false
 
-[[package]] # the double square brackets define a TOML table array
-name = "binix"
-
-[[package]]
-name = "binix-server"
-
-[[package]]
-name = "binix-client"
-
-[[package]]
-name = "binix-token"
-
 [changelog]
 protect_breaking_commits = true # always include commits with breaking changes in the changelog
