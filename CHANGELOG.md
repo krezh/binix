@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.30](https://github.com/krezh/binix/compare/v0.2.29...v0.2.30) (2025-12-12)
+
+
+### Bug Fixes
+
+* ssl ([67ca43a](https://github.com/krezh/binix/commit/67ca43a6b82f1e84b66b7c936fa864f389fc0eaa))
+
 ## [0.2.29](https://github.com/krezh/binix/compare/v0.2.28...v0.2.29) (2025-12-12)
 
 
