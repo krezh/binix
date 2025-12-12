@@ -3,6 +3,9 @@
     ".": {
       "release-type": "rust",
       "include-component-in-tag": false,
+      "plugins": [
+        "cargo-workspace"
+      ],
       "exclude-paths": [
         ".github/workflows"
       ],
