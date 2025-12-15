@@ -89,6 +89,8 @@ pub(crate) async fn upload_path(
     headers: HeaderMap,
     body: Body,
 ) -> ServerResult<Json<UploadPathResult>> {
+    use binix::api::v1::upload_path::BINIX_CHUNKED_UPLOAD;
+
     let stream = body.into_data_stream();
     let mut stream = StreamReader::new(
         stream.map(|r| r.map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))),
@@ -137,6 +139,11 @@ pub(crate) async fn upload_path(
             return Err(ErrorKind::RequestError(anyhow!("{} must be set", BINIX_NAR_INFO)).into());
         }
     };
+
+    if headers.contains_key(BINIX_CHUNKED_UPLOAD) {
+        return handle_chunked_upload(state, req_state, headers, upload_info, stream).await;
+    }
+
     let cache_name = &upload_info.cache;
 
     let database = state.database().await?;
@@ -178,6 +185,167 @@ pub(crate) async fn upload_path(
 
     // New NAR or need to repair
     upload_path_new(username, cache, upload_info, stream, database, &state).await
+}
+
+/// Handles a chunked upload request.
+async fn handle_chunked_upload(
+    state: State,
+    req_state: RequestState,
+    headers: HeaderMap,
+    upload_info: UploadPathNarInfo,
+    mut stream: StreamReader<
+        impl futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Unpin,
+        bytes::Bytes,
+    >,
+) -> ServerResult<Json<UploadPathResult>> {
+    use binix::api::v1::upload_path::{
+        BINIX_CHUNK_HASH, BINIX_CHUNK_INDEX, BINIX_CHUNK_SESSION_ID, BINIX_CHUNK_TOTAL,
+    };
+
+    let database = state.database().await?;
+    let cache_name = &upload_info.cache;
+
+    let cache = req_state
+        .auth
+        .auth_cache(database, cache_name, |cache, permission| {
+            permission.require_push()?;
+            Ok(cache)
+        })
+        .await?;
+
+    let session_id = headers
+        .get(BINIX_CHUNK_SESSION_ID)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let chunk_index: u32 = headers
+        .get(BINIX_CHUNK_INDEX)
+        .ok_or_else(|| ErrorKind::RequestError(anyhow!("Missing chunk index header")))?
+        .to_str()
+        .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid chunk index header")))?
+        .parse()
+        .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid chunk index value")))?;
+
+    let total_chunks: u32 = headers
+        .get(BINIX_CHUNK_TOTAL)
+        .ok_or_else(|| ErrorKind::RequestError(anyhow!("Missing total chunks header")))?
+        .to_str()
+        .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid total chunks header")))?
+        .parse()
+        .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid total chunks value")))?;
+
+    let chunk_hash_header = headers
+        .get(BINIX_CHUNK_HASH)
+        .ok_or_else(|| ErrorKind::RequestError(anyhow!("Missing chunk hash header")))?
+        .to_str()
+        .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid chunk hash header")))?
+        .to_string();
+
+    let chunk_size = state.config.chunked_upload.max_chunk_size;
+
+    let session_id = if let Some(session_id) = session_id {
+        session_id
+    } else {
+        state
+            .chunked_session_manager
+            .create_session(cache.id, upload_info.clone(), total_chunks, chunk_size)
+            .await
+            .map_err(|e| ErrorKind::RequestError(e.into()))?
+    };
+
+    let mut chunk_data = Vec::new();
+    stream
+        .read_to_end(&mut chunk_data)
+        .await
+        .map_err(ServerError::request_error)?;
+
+    let chunk_bytes = Bytes::from(chunk_data);
+
+    let chunk_hash = {
+        let mut hasher = Sha256::new();
+        hasher.update(&chunk_bytes);
+        let result = hasher.finalize();
+        format!("sha256:{}", hex::encode(result))
+    };
+
+    if chunk_hash != chunk_hash_header {
+        return Err(ErrorKind::RequestError(anyhow!(
+            "Chunk hash mismatch: expected {}, got {}",
+            chunk_hash_header,
+            chunk_hash
+        ))
+        .into());
+    }
+
+    state
+        .chunked_session_manager
+        .write_chunk(&session_id, chunk_index, chunk_bytes)
+        .await
+        .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+    let is_complete = state
+        .chunked_session_manager
+        .is_complete(&session_id)
+        .await
+        .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+    if is_complete {
+        let reassembled_stream = state
+            .chunked_session_manager
+            .get_reassembled_stream(&session_id)
+            .await
+            .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+        let username = req_state.auth.username().map(str::to_string);
+
+        if let Some(existing_nar) = database.find_and_lock_nar(&upload_info.nar_hash).await? {
+            let missing_chunk = ChunkRef::find()
+                .filter(chunkref::Column::NarId.eq(existing_nar.id))
+                .filter(chunkref::Column::ChunkId.is_null())
+                .limit(1)
+                .one(database)
+                .await
+                .map_err(ServerError::database_error)?;
+
+            if missing_chunk.is_none() {
+                return upload_path_dedup(
+                    username,
+                    cache,
+                    upload_info,
+                    reassembled_stream,
+                    database,
+                    &state,
+                    existing_nar,
+                )
+                .await;
+            }
+        }
+
+        upload_path_new(
+            username,
+            cache,
+            upload_info,
+            reassembled_stream,
+            database,
+            &state,
+        )
+        .await
+    } else {
+        let received = state
+            .chunked_session_manager
+            .chunks_received(&session_id)
+            .await
+            .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+        Ok(Json(UploadPathResult {
+            kind: UploadPathResultKind::ChunkReceived {
+                received,
+                total: total_chunks,
+            },
+            file_size: None,
+            frac_deduplicated: None,
+        }))
+    }
 }
 
 /// Uploads a path when there is already a matching NAR in the global cache.

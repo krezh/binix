@@ -15,6 +15,7 @@
 
 mod api;
 mod cache;
+mod chunked_upload;
 mod cli;
 mod command;
 mod config;

@@ -15,6 +15,7 @@
 
 pub mod access;
 mod api;
+mod chunked_session;
 mod compression;
 pub mod config;
 pub mod database;
@@ -47,6 +48,7 @@ use tower_http::trace::TraceLayer;
 
 use access::http::{apply_auth, AuthState};
 use binix::cache::CacheName;
+use chunked_session::ChunkedSessionManager;
 use config::{Config, StorageConfig};
 use database::migration::{Migrator, MigratorTrait};
 use error::{ErrorKind, ServerError, ServerResult};
@@ -67,6 +69,9 @@ pub struct StateInner {
 
     /// Handle to the storage backend.
     storage: OnceCell<Arc<Box<dyn StorageBackend>>>,
+
+    /// Chunked upload session manager.
+    chunked_session_manager: Arc<ChunkedSessionManager>,
 }
 
 /// Request state.
@@ -96,10 +101,14 @@ struct RequestStateInner {
 
 impl StateInner {
     async fn new(config: Config) -> State {
+        let chunked_session_manager =
+            Arc::new(ChunkedSessionManager::new(config.chunked_upload.clone()));
+
         Arc::new(Self {
             config,
             database: OnceCell::new(),
             storage: OnceCell::new(),
+            chunked_session_manager,
         })
     }
 
@@ -244,15 +253,38 @@ pub async fn run_api_server(cli_listen: Option<SocketAddr>, config: Config) -> R
 
     let listener = TcpListener::bind(&listen).await?;
 
-    let (server_ret, _) = tokio::join!(axum::serve(listener, rest).into_future(), async {
-        if state.config.database.heartbeat {
-            let _ = state.run_db_heartbeat().await;
-        }
-    },);
+    let (server_ret, _, _) = tokio::join!(
+        axum::serve(listener, rest).into_future(),
+        async {
+            if state.config.database.heartbeat {
+                let _ = state.run_db_heartbeat().await;
+            }
+        },
+        async {
+            if state.config.chunked_upload.enabled {
+                let _ = run_chunked_session_cleanup(state.clone()).await;
+            }
+        },
+    );
 
     server_ret?;
 
     Ok(())
+}
+
+/// Runs periodic cleanup of expired chunked upload sessions.
+async fn run_chunked_session_cleanup(state: State) {
+    let mut interval = time::interval(Duration::from_secs(300)); // 5 minutes
+
+    loop {
+        interval.tick().await;
+
+        if let Ok(cleaned) = state.chunked_session_manager.cleanup_expired().await {
+            if cleaned > 0 {
+                tracing::info!("Cleaned up {} expired chunked upload sessions", cleaned);
+            }
+        }
+    }
 }
 
 /// Runs database migrations.

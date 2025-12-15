@@ -11,6 +11,21 @@ pub const BINIX_NAR_INFO: &str = "X-Binix-Nar-Info";
 /// Header containing the size of the upload info at the beginning of the body.
 pub const BINIX_NAR_INFO_PREAMBLE_SIZE: &str = "X-Binix-Nar-Info-Preamble-Size";
 
+/// Header indicating this is a chunked upload.
+pub const BINIX_CHUNKED_UPLOAD: &str = "X-Binix-Chunked-Upload";
+
+/// Header containing the session ID for chunked uploads.
+pub const BINIX_CHUNK_SESSION_ID: &str = "X-Binix-Chunk-Session-Id";
+
+/// Header containing the chunk index (0-based).
+pub const BINIX_CHUNK_INDEX: &str = "X-Binix-Chunk-Index";
+
+/// Header containing the total number of chunks.
+pub const BINIX_CHUNK_TOTAL: &str = "X-Binix-Chunk-Total";
+
+/// Header containing the SHA256 hash of the chunk.
+pub const BINIX_CHUNK_HASH: &str = "X-Binix-Chunk-Hash";
+
 /// NAR information associated with a upload.
 ///
 /// There are two ways for the client to supply the NAR information:
@@ -25,7 +40,7 @@ pub const BINIX_NAR_INFO_PREAMBLE_SIZE: &str = "X-Binix-Nar-Info-Preamble-Size";
 /// Regardless of client compression, the server will always decompress
 /// the NAR to validate the NAR hash before applying the server-configured
 /// compression again.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadPathNarInfo {
     /// The name of the binary cache to upload to.
     pub cache: CacheName,
@@ -92,6 +107,17 @@ pub enum UploadPathResultKind {
     /// The exact semantics of what counts as deduplicated
     /// is opaque to the client.
     Deduplicated,
+
+    /// A chunk was received in a chunked upload.
+    ///
+    /// The upload is not yet complete. The client should continue
+    /// uploading remaining chunks.
+    ChunkReceived {
+        /// Number of chunks received so far.
+        received: u32,
+        /// Total number of chunks expected.
+        total: u32,
+    },
 }
 
 impl Default for UploadPathResultKind {

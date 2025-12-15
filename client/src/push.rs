@@ -33,6 +33,7 @@ use tokio::task::{spawn, JoinHandle};
 use tokio::time;
 
 use crate::api::ApiClient;
+use crate::chunked_upload;
 use binix::api::v1::cache_config::CacheConfig;
 use binix::api::v1::upload_path::{UploadPathNarInfo, UploadPathResult, UploadPathResultKind};
 use binix::cache::CacheName;
@@ -504,6 +505,17 @@ pub async fn upload_path(
     mp: MultiProgress,
     force_preamble: bool,
 ) -> Result<()> {
+    if path_info.nar_size >= chunked_upload::CHUNKING_THRESHOLD as u64 {
+        let config = PushConfig {
+            num_workers: 1,
+            force_preamble,
+        };
+        return chunked_upload::upload_path_chunked(
+            path_info, store, api, cache, mp, config,
+        )
+        .await;
+    }
+
     let path = &path_info.path;
     let upload_info = {
         let full_path = store

@@ -129,6 +129,11 @@ pub struct Config {
     #[serde(default = "Default::default")]
     pub jwt: JWTConfig,
 
+    /// Chunked upload configuration.
+    #[serde(rename = "chunked-upload")]
+    #[serde(default = "Default::default")]
+    pub chunked_upload: ChunkedUploadConfig,
+
     /// (Deprecated Stub)
     ///
     /// This simply results in an error telling the user to update
@@ -322,6 +327,34 @@ pub struct GarbageCollectionConfig {
     #[serde(rename = "default-retention-period")]
     #[serde(with = "humantime_serde", default = "default_default_retention_period")]
     pub default_retention_period: Duration,
+}
+
+/// Chunked upload configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChunkedUploadConfig {
+    /// Whether chunked uploads are enabled.
+    #[serde(default = "default_chunked_upload_enabled")]
+    pub enabled: bool,
+
+    /// Session timeout in seconds.
+    #[serde(rename = "session-timeout-secs")]
+    #[serde(default = "default_session_timeout_secs")]
+    pub session_timeout_secs: u64,
+
+    /// Maximum chunk size in bytes.
+    #[serde(rename = "max-chunk-size")]
+    #[serde(default = "default_max_chunk_size")]
+    pub max_chunk_size: usize,
+}
+
+impl Default for ChunkedUploadConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_chunked_upload_enabled(),
+            session_timeout_secs: default_session_timeout_secs(),
+            max_chunk_size: default_max_chunk_size(),
+        }
+    }
 }
 
 fn load_jwt_signing_config_from_env() -> JWTSigningConfig {
@@ -562,6 +595,18 @@ fn default_default_retention_period() -> Duration {
 
 fn default_max_nar_info_size() -> usize {
     1 * 1024 * 1024 // 1 MiB
+}
+
+fn default_chunked_upload_enabled() -> bool {
+    true
+}
+
+fn default_session_timeout_secs() -> u64 {
+    1200 // 20 minutes
+}
+
+fn default_max_chunk_size() -> usize {
+    64 * 1024 * 1024 // 64 MB
 }
 
 fn load_config_from_path(path: &Path) -> Result<Config> {

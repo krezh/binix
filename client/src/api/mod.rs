@@ -214,6 +214,62 @@ impl ApiClient {
             Err(api_error.into())
         }
     }
+
+    /// Uploads a chunk for a chunked upload.
+    pub async fn upload_path_chunked(
+        &self,
+        nar_info: &UploadPathNarInfo,
+        session_id: &str,
+        chunk_index: u32,
+        total_chunks: u32,
+        chunk_hash: &str,
+        chunk_data: Bytes,
+        force_preamble: bool,
+    ) -> Result<Option<UploadPathResult>> {
+        use binix::api::v1::upload_path::{
+            BINIX_CHUNK_HASH, BINIX_CHUNK_INDEX, BINIX_CHUNK_SESSION_ID, BINIX_CHUNK_TOTAL,
+            BINIX_CHUNKED_UPLOAD,
+        };
+
+        let endpoint = self.endpoint.join("_api/v1/upload-path")?;
+        let upload_info_json = serde_json::to_string(nar_info)?;
+
+        let mut req = self
+            .client
+            .put(endpoint)
+            .header(USER_AGENT, HeaderValue::from_str(BINIX_USER_AGENT)?)
+            .header(BINIX_CHUNKED_UPLOAD, "true")
+            .header(BINIX_CHUNK_SESSION_ID, session_id)
+            .header(BINIX_CHUNK_INDEX, chunk_index)
+            .header(BINIX_CHUNK_TOTAL, total_chunks)
+            .header(BINIX_CHUNK_HASH, chunk_hash);
+
+        if force_preamble || upload_info_json.len() >= NAR_INFO_PREAMBLE_THRESHOLD {
+            req = req
+                .header(BINIX_NAR_INFO_PREAMBLE_SIZE, upload_info_json.len())
+                .body(
+                    [upload_info_json.as_bytes(), chunk_data.as_ref()]
+                        .concat()
+                        .to_vec(),
+                );
+        } else {
+            req = req
+                .header(BINIX_NAR_INFO, HeaderValue::from_str(&upload_info_json)?)
+                .body(chunk_data.to_vec());
+        }
+
+        let res = req.send().await?;
+
+        if res.status().is_success() {
+            match res.json().await {
+                Ok(r) => Ok(Some(r)),
+                Err(_) => Ok(None),
+            }
+        } else {
+            let api_error = ApiError::try_from_response(res).await?;
+            Err(api_error.into())
+        }
+    }
 }
 
 impl StdError for ApiError {}
