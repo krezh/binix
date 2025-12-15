@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.3.0](https://github.com/krezh/binix/compare/v0.2.31...v0.3.0) (2025-12-14)
+
+
+### Features
+
+* **cargo:** update bytes ( 1.10.1 → 1.11.0 ) ([#42](https://github.com/krezh/binix/issues/42)) ([bf00d6d](https://github.com/krezh/binix/commit/bf00d6d01994ffc2b1e253208814d6e021c40ae1))
+* **cargo:** update console-subscriber ( 0.2.0 → 0.5.0 ) ([#43](https://github.com/krezh/binix/issues/43)) ([6a73096](https://github.com/krezh/binix/commit/6a73096e1acbb529b389c900038e712a77025d18))
+* **cargo:** update criterion ( 0.6.0 → 0.8.1 ) ([#44](https://github.com/krezh/binix/issues/44)) ([9f8fbf6](https://github.com/krezh/binix/commit/9f8fbf66aebb3dd45072cd2c5f39b8d84708a490))
+* **cargo:** update derive_more ( 2.0.1 → 2.1.0 ) ([#45](https://github.com/krezh/binix/issues/45)) ([7ad33dd](https://github.com/krezh/binix/commit/7ad33dd65f742937b4fd1e08502227d04fb773a3))
+* **cargo:** update dialoguer ( 0.11.0 → 0.12.0 ) ([#46](https://github.com/krezh/binix/issues/46)) ([9a62c69](https://github.com/krezh/binix/commit/9a62c692f30567fcad66476e3469bce776f0dbd5))
+* **cargo:** update ed25519-compact ( 2.1.1 → 2.2.0 ) ([#47](https://github.com/krezh/binix/issues/47)) ([8ea8692](https://github.com/krezh/binix/commit/8ea8692281d00fcb18f77e7b46606edf6eb3a860))
+* **cargo:** update humantime ( 2.2.0 → 2.3.0 ) ([#48](https://github.com/krezh/binix/issues/48)) ([5dbb378](https://github.com/krezh/binix/commit/5dbb3780f058694ea0c1fc741184e4b05f5c708d))
+* **cargo:** update indexmap ( 2.10.0 → 2.12.1 ) ([#49](https://github.com/krezh/binix/issues/49)) ([4da1dc6](https://github.com/krezh/binix/commit/4da1dc699760dc7ce2240a6ddeb84ad84cece952))
+* **cargo:** update notify ( 8.1.0 → 8.2.0 ) ([#51](https://github.com/krezh/binix/issues/51)) ([0b29315](https://github.com/krezh/binix/commit/0b29315fa03b6ee219045c5012465abbda169398))
+* **cargo:** update serde_with ( 3.14.0 → 3.16.1 ) ([#54](https://github.com/krezh/binix/issues/54)) ([b93f7e9](https://github.com/krezh/binix/commit/b93f7e9b7660bb41018f70e21e221b5ae8f8cc0c))
+* **cargo:** update tempfile ( 3.20.0 → 3.23.0 ) ([#55](https://github.com/krezh/binix/issues/55)) ([0e725c9](https://github.com/krezh/binix/commit/0e725c9fd7005f44516ccae240a6d2fd859bc1dd))
+* **cargo:** update tower-http ( 0.5.2 → 0.6.8 ) ([#58](https://github.com/krezh/binix/issues/58)) ([5494d97](https://github.com/krezh/binix/commit/5494d97ff287dc2efca698212f6a81a164de9e91))
+* **cargo:** update uuid ( 1.17.0 → 1.19.0 ) ([#59](https://github.com/krezh/binix/issues/59)) ([e1fd9ad](https://github.com/krezh/binix/commit/e1fd9ade4aa4a55c93a9e802a314f47705ab8066))
+* **cargo:** update wildmatch ( 2.4.0 → 2.6.1 ) ([#60](https://github.com/krezh/binix/issues/60)) ([c6fe622](https://github.com/krezh/binix/commit/c6fe622ca585030469b30934f35f90890729c641))
+
+
+### Bug Fixes
+
+* **cargo:** update anyhow ( 1.0.98 → 1.0.100 ) ([#22](https://github.com/krezh/binix/issues/22)) ([52516db](https://github.com/krezh/binix/commit/52516dbfd3a33c782f3bef554ebc9a451ab79702))
+* **cargo:** update async-compression ( 0.4.25 → 0.4.36 ) ([#23](https://github.com/krezh/binix/issues/23)) ([4c2931c](https://github.com/krezh/binix/commit/4c2931c67626770b0610ba3c27d0b3e616cd9054))
+* **cargo:** update async-trait ( 0.1.88 → 0.1.89 ) ([#24](https://github.com/krezh/binix/issues/24)) ([7cc7638](https://github.com/krezh/binix/commit/7cc76386f8df8c54bd9fcd534c533d821a0f9aaf))
+* **cargo:** update cc ( 1.2.29 → 1.2.49 ) ([#25](https://github.com/krezh/binix/issues/25)) ([61eedc7](https://github.com/krezh/binix/commit/61eedc7fc7a3f1d0814bae30d7834ec5c2424afd))
+* **cargo:** update chrono ( 0.4.41 → 0.4.42 ) ([#26](https://github.com/krezh/binix/issues/26)) ([c2b54f0](https://github.com/krezh/binix/commit/c2b54f0f6d51d59baa589b183f2b8e78515169bb))
+* **cargo:** update clap ( 4.5.40 → 4.5.53 ) ([#27](https://github.com/krezh/binix/issues/27)) ([18feac0](https://github.com/krezh/binix/commit/18feac07fffaa7e5ed49d079930c97eb21992092))
+* **cargo:** update clap_complete ( 4.5.54 → 4.5.61 ) ([#28](https://github.com/krezh/binix/issues/28)) ([213f951](https://github.com/krezh/binix/commit/213f9518e39c53d95c093adf6306d3092fec03b9))
+* **cargo:** update const_format ( 0.2.34 → 0.2.35 ) ([#29](https://github.com/krezh/binix/issues/29)) ([0d58630](https://github.com/krezh/binix/commit/0d58630e3f1cf3aedbea2b8c29fdf6e108f6f582))
+* **cargo:** update indicatif ( 0.18.0 → 0.18.3 ) ([#31](https://github.com/krezh/binix/issues/31)) ([147dc23](https://github.com/krezh/binix/commit/147dc23ee5f1755e029822fa5988910578663e2a))
+* **cargo:** update reqwest ( 0.12.22 → 0.12.25 ) ([#32](https://github.com/krezh/binix/issues/32)) ([3dc045a](https://github.com/krezh/binix/commit/3dc045a039baff4deed1152c698b4d2a40dcb675))
+* **cargo:** update rsa ( 0.9.8 → 0.9.9 ) ([#33](https://github.com/krezh/binix/issues/33)) ([1c696c4](https://github.com/krezh/binix/commit/1c696c4ce216c8afc296a91f605716c6d0c55ca7))
+* **cargo:** update sea-orm monorepo ( 1.1.13 → 1.1.19 ) ([#34](https://github.com/krezh/binix/issues/34)) ([13247a4](https://github.com/krezh/binix/commit/13247a4dda938fcb667024833a6bf83d931a31e8))
+* **cargo:** update serde ( 1.0.219 → 1.0.228 ) ([#35](https://github.com/krezh/binix/issues/35)) ([88c716d](https://github.com/krezh/binix/commit/88c716de887e15efbb1c1ae60e1f891681083c34))
+* **cargo:** update serde_json ( 1.0.140 → 1.0.145 ) ([#36](https://github.com/krezh/binix/issues/36)) ([ead13a1](https://github.com/krezh/binix/commit/ead13a1cf1e4feb7eb6418cbc540167edeb82bed))
+* **cargo:** update system-deps ( 7.0.5 → 7.0.7 ) ([#37](https://github.com/krezh/binix/issues/37)) ([cdf3d88](https://github.com/krezh/binix/commit/cdf3d88aea2a1404731d04c8f2a914efb0b6bb01))
+* **cargo:** update tokio-tracing monorepo ([#38](https://github.com/krezh/binix/issues/38)) ([57ea14b](https://github.com/krezh/binix/commit/57ea14b66a40f0c0a75601e115a68651d0f65102))
+* **cargo:** update tokio-util ( 0.7.15 → 0.7.17 ) ([#39](https://github.com/krezh/binix/issues/39)) ([0e8b9fb](https://github.com/krezh/binix/commit/0e8b9fb6ae0214cb502cb7b62d002fa5a8e5cc4e))
+* **cargo:** update version-compare ( 0.2.0 → 0.2.1 ) ([#40](https://github.com/krezh/binix/issues/40)) ([fba8dbb](https://github.com/krezh/binix/commit/fba8dbb6e452a8aa9c0edecaea809f3dfdc63f48))
+
 ## [0.2.31](https://github.com/krezh/binix/compare/v0.2.30...v0.2.31) (2025-12-12)
 
 
