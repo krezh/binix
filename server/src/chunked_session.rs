@@ -37,13 +37,12 @@ pub struct ChunkedUploadSession {
 impl ChunkedUploadSession {
     /// Creates a new chunked upload session.
     fn new(
+        session_id: String,
         cache_id: i64,
         nar_info: UploadPathNarInfo,
         total_chunks: u32,
         chunk_size: usize,
     ) -> Self {
-        let session_id = Uuid::new_v4().to_string();
-
         Self {
             session_id,
             cache_id,
@@ -108,16 +107,28 @@ impl ChunkedSessionManager {
         }
     }
 
+    /// Checks if a session exists.
+    pub async fn session_exists(&self, session_id: &str) -> bool {
+        let sessions = self.sessions.lock().await;
+        sessions.contains_key(session_id)
+    }
+
     /// Creates a new upload session.
     pub async fn create_session(
         &self,
+        session_id: String,
         cache_id: i64,
         nar_info: UploadPathNarInfo,
         total_chunks: u32,
         chunk_size: usize,
     ) -> Result<String> {
-        let session = ChunkedUploadSession::new(cache_id, nar_info, total_chunks, chunk_size);
-        let session_id = session.session_id.clone();
+        let session = ChunkedUploadSession::new(
+            session_id.clone(),
+            cache_id,
+            nar_info,
+            total_chunks,
+            chunk_size,
+        );
 
         let mut sessions = self.sessions.lock().await;
         sessions.insert(session_id.clone(), session);

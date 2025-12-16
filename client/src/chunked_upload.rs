@@ -98,8 +98,11 @@ pub async fn upload_path_chunked(
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
     );
 
+    let mut bytes_uploaded = 0u64;
+
     for chunk_index in 0..total_chunks {
-        let chunk_capacity = chunk_size.min(nar_size) as usize;
+        let remaining = nar_size - bytes_uploaded;
+        let chunk_capacity = chunk_size.min(remaining) as usize;
         let mut chunk_data = vec![0u8; chunk_capacity];
         let bytes_read = nar_reader.read(&mut chunk_data).await?;
 
@@ -132,6 +135,7 @@ pub async fn upload_path_chunked(
         .await?;
 
         pb.inc(chunk_bytes.len() as u64);
+        bytes_uploaded += chunk_bytes.len() as u64;
 
         match result.kind {
             UploadPathResultKind::ChunkReceived => {

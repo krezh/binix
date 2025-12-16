@@ -243,12 +243,27 @@ async fn handle_chunked_upload(
 
     let chunk_size = state.config.chunked_upload.max_chunk_size;
 
-    let session_id = if let Some(session_id) = session_id {
-        session_id
+    let session_id = if let Some(sid) = session_id {
+        // Check if session exists, if not create it with the provided ID
+        if !state
+            .chunked_session_manager
+            .session_exists(&sid)
+            .await
+        {
+            state
+                .chunked_session_manager
+                .create_session(sid.clone(), cache.id, upload_info.clone(), total_chunks, chunk_size)
+                .await
+                .map_err(|e| ErrorKind::RequestError(e.into()))?;
+        }
+        sid
     } else {
+        // No session ID provided, generate a new one
+        use uuid::Uuid;
+        let new_id = Uuid::new_v4().to_string();
         state
             .chunked_session_manager
-            .create_session(cache.id, upload_info.clone(), total_chunks, chunk_size)
+            .create_session(new_id.clone(), cache.id, upload_info.clone(), total_chunks, chunk_size)
             .await
             .map_err(|e| ErrorKind::RequestError(e.into()))?
     };
