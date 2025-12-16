@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/krezh/binix/compare/v0.3.0...v0.4.0) (2025-12-16)
+
+
+### Features
+
+* add client to server chunking ([7514e83](https://github.com/krezh/binix/commit/7514e83a1717f3a2b45f93e55154a654ea42bc61))
+
+
+### Bug Fixes
+
+* **cargo:** update reqwest ( 0.12.25 → 0.12.26 ) ([#63](https://github.com/krezh/binix/issues/63)) ([ecde3c4](https://github.com/krezh/binix/commit/ecde3c41e2d11abaf2f8be62261d7e2b08ad025b))
+* fix build ([e326833](https://github.com/krezh/binix/commit/e3268338b35a7a043c09a885d1cbd8032e0c8c83))
+
 ## [0.3.0](https://github.com/krezh/binix/compare/v0.2.31...v0.3.0) (2025-12-14)
 
 
