@@ -112,12 +112,7 @@ pub enum UploadPathResultKind {
     ///
     /// The upload is not yet complete. The client should continue
     /// uploading remaining chunks.
-    ChunkReceived {
-        /// Number of chunks received so far.
-        received: u32,
-        /// Total number of chunks expected.
-        total: u32,
-    },
+    ChunkReceived,
 }
 
 impl Default for UploadPathResultKind {

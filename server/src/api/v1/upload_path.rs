@@ -331,17 +331,8 @@ async fn handle_chunked_upload(
         )
         .await
     } else {
-        let received = state
-            .chunked_session_manager
-            .chunks_received(&session_id)
-            .await
-            .map_err(|e| ErrorKind::RequestError(e.into()))?;
-
         Ok(Json(UploadPathResult {
-            kind: UploadPathResultKind::ChunkReceived {
-                received,
-                total: total_chunks,
-            },
+            kind: UploadPathResultKind::ChunkReceived,
             file_size: None,
             frac_deduplicated: None,
         }))

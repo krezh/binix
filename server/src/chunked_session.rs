@@ -76,18 +76,6 @@ impl ChunkedUploadSession {
         self.received_chunks.len() == self.total_chunks as usize
     }
 
-    /// Gets the number of chunks received.
-    fn chunks_received(&self) -> u32 {
-        self.received_chunks.len() as u32
-    }
-
-    /// Gets missing chunk indices.
-    fn missing_chunks(&self) -> Vec<u32> {
-        (0..self.total_chunks)
-            .filter(|i| !self.received_chunks.contains(i))
-            .collect()
-    }
-
     /// Gets the reassembled NAR stream.
     fn get_reassembled_stream(self) -> Result<Box<dyn AsyncBufRead + Send + Unpin>> {
         let mut buffer = Vec::with_capacity(self.nar_info.nar_size);
@@ -160,26 +148,6 @@ impl ChunkedSessionManager {
             .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
 
         Ok(session.is_complete())
-    }
-
-    /// Gets the number of chunks received.
-    pub async fn chunks_received(&self, session_id: &str) -> Result<u32> {
-        let sessions = self.sessions.lock().await;
-        let session = sessions
-            .get(session_id)
-            .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
-
-        Ok(session.chunks_received())
-    }
-
-    /// Gets the total number of chunks.
-    pub async fn total_chunks(&self, session_id: &str) -> Result<u32> {
-        let sessions = self.sessions.lock().await;
-        let session = sessions
-            .get(session_id)
-            .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
-
-        Ok(session.total_chunks)
     }
 
     /// Gets the reassembled NAR stream and removes the session.

@@ -134,7 +134,7 @@ pub async fn upload_path_chunked(
         pb.inc(chunk_bytes.len() as u64);
 
         match result.kind {
-            UploadPathResultKind::ChunkReceived { received, total } => {
+            UploadPathResultKind::ChunkReceived => {
                 // Continue uploading
             }
             UploadPathResultKind::Uploaded | UploadPathResultKind::Deduplicated => {
