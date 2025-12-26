@@ -345,6 +345,20 @@ pub struct ChunkedUploadConfig {
     #[serde(rename = "max-chunk-size")]
     #[serde(default = "default_max_chunk_size")]
     pub max_chunk_size: usize,
+
+    /// Number of CDC chunks to upload concurrently.
+    #[serde(rename = "cdc-upload-concurrency")]
+    #[serde(default = "default_cdc_upload_concurrency")]
+    pub cdc_upload_concurrency: usize,
+
+    /// Skip server-side NAR hash validation for chunked uploads.
+    ///
+    /// When enabled, the server trusts the client-provided NAR hash without
+    /// re-downloading all CDC chunks to verify. Individual chunk hashes are
+    /// still validated on upload. This significantly speeds up large uploads.
+    #[serde(rename = "skip-nar-hash-validation")]
+    #[serde(default = "default_skip_nar_hash_validation")]
+    pub skip_nar_hash_validation: bool,
 }
 
 impl Default for ChunkedUploadConfig {
@@ -353,6 +367,8 @@ impl Default for ChunkedUploadConfig {
             enabled: default_chunked_upload_enabled(),
             session_timeout_secs: default_session_timeout_secs(),
             max_chunk_size: default_max_chunk_size(),
+            cdc_upload_concurrency: default_cdc_upload_concurrency(),
+            skip_nar_hash_validation: default_skip_nar_hash_validation(),
         }
     }
 }
@@ -607,6 +623,14 @@ fn default_session_timeout_secs() -> u64 {
 
 fn default_max_chunk_size() -> usize {
     64 * 1024 * 1024 // 64 MB
+}
+
+fn default_cdc_upload_concurrency() -> usize {
+    10
+}
+
+fn default_skip_nar_hash_validation() -> bool {
+    false
 }
 
 fn load_config_from_path(path: &Path) -> Result<Config> {

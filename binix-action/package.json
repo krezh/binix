@@ -1,0 +1,23 @@
+{
+	"name": "binix-action",
+	"version": "0.1.0",
+	"description": "Cache Nix derivations with Binix",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "esbuild src/index.ts --outdir=dist --platform=node --format=cjs --bundle --minify-whitespace --minify-syntax",
+		"format": "prettier --write ."
+	},
+	"author": "krezh",
+	"license": "MIT",
+	"dependencies": {
+		"@actions/core": "^1.11.1",
+		"@actions/exec": "^1.1.1",
+		"@actions/io": "^1.1.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"esbuild": "^0.24.0",
+		"prettier": "^3.4.0",
+		"typescript": "^5.7.0"
+	}
+}

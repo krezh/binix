@@ -146,7 +146,10 @@ impl S3Backend {
         prefer_stream: bool,
     ) -> ServerResult<Download> {
         if prefer_stream {
-            let output = req.send().await.map_err(ServerError::storage_error)?;
+            let output = req.send().await.map_err(|e| {
+                tracing::error!("S3 GetObject failed: {:?}", e);
+                ServerError::storage_error(e)
+            })?;
 
             Ok(Download::AsyncRead(Box::new(output.body.into_async_read())))
         } else {
@@ -343,26 +346,46 @@ impl StorageBackend for S3Backend {
         Ok(())
     }
 
-    async fn download_file(&self, name: String, prefer_stream: bool) -> ServerResult<Download> {
-        let req = self
-            .client
-            .get_object()
-            .bucket(&self.config.bucket)
-            .key(&name);
-
-        self.get_download(req, prefer_stream).await
-    }
-
     async fn download_file_db(
         &self,
         file: &RemoteFile,
         prefer_stream: bool,
     ) -> ServerResult<Download> {
-        let (client, file) = self.get_client_from_db_ref(file).await?;
+        let (client, s3_file) = self.get_client_from_db_ref(file).await?;
 
-        let req = client.get_object().bucket(&file.bucket).key(&file.key);
+        let mut last_error = None;
+        for attempt in 0..3 {
+            if attempt > 0 {
+                let delay = Duration::from_millis(100 * (1 << attempt));
+                tokio::time::sleep(delay).await;
+                tracing::debug!(
+                    "Retrying S3 download (attempt {}): bucket={}, key={}",
+                    attempt + 1,
+                    s3_file.bucket,
+                    s3_file.key
+                );
+            }
 
-        self.get_download(req, prefer_stream).await
+            let req = client
+                .get_object()
+                .bucket(&s3_file.bucket)
+                .key(&s3_file.key);
+
+            match self.get_download(req, prefer_stream).await {
+                Ok(download) => return Ok(download),
+                Err(e) => {
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        let e = last_error.unwrap();
+        tracing::error!(
+            "Failed to download S3 object after 3 attempts: bucket={}, key={}",
+            s3_file.bucket,
+            s3_file.key
+        );
+        Err(e)
     }
 
     async fn make_db_reference(&self, name: String) -> ServerResult<RemoteFile> {

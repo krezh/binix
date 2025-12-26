@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
-use indicatif::MultiProgress;
+use indicatif::{HumanBytes, MultiProgress};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
 use crate::api::ApiClient;
@@ -41,6 +41,14 @@ pub struct Push {
     /// The maximum number of parallel upload processes.
     #[clap(short = 'j', long, default_value = "5")]
     jobs: usize,
+
+    /// The maximum number of parallel chunk uploads for large files.
+    #[clap(long, default_value = "4")]
+    chunk_concurrency: usize,
+
+    /// Suppress progress bars, show only errors and final summary.
+    #[clap(short, long)]
+    quiet: bool,
 
     /// Always send the upload info as part of the payload.
     #[clap(long, hide = true)]
@@ -90,24 +98,35 @@ impl PushContext {
             }
 
             return Ok(());
-        } else {
-            eprintln!("⚙️ Pushing {num_missing_paths} paths to \"{cache}\" on \"{server}\" ({num_already_cached} already cached, {num_upstream} in upstream)...",
-                cache = self.cache_name.as_str(),
-                server = self.server_name.as_str(),
-                num_missing_paths = plan.store_path_map.len(),
-                num_already_cached = plan.num_already_cached,
-                num_upstream = plan.num_upstream,
+        }
+
+        // Calculate total bytes
+        let total_bytes: u64 = plan.store_path_map.values().map(|p| p.nar_size).sum();
+        let num_paths = plan.store_path_map.len();
+
+        eprintln!(
+            "⚙️ Pushing {} paths ({}) to \"{}\" on \"{}\"",
+            num_paths,
+            HumanBytes(total_bytes),
+            self.cache_name.as_str(),
+            self.server_name.as_str(),
+        );
+        if plan.num_already_cached > 0 || plan.num_upstream > 0 {
+            eprintln!(
+                "   Skipped: {} already cached, {} in upstream",
+                plan.num_already_cached, plan.num_upstream
             );
         }
+        eprintln!();
+
+        // Initialize overall progress
+        self.pusher.init_progress(num_paths, total_bytes).await;
 
         for (_, path_info) in plan.store_path_map {
             self.pusher.queue(path_info).await?;
         }
 
-        let results = self.pusher.wait().await;
-        results.into_values().collect::<Result<Vec<()>>>()?;
-
-        Ok(())
+        self.pusher.wait().await
     }
 
     async fn push_stdin(self) -> Result<()> {
@@ -128,7 +147,20 @@ impl PushContext {
         }
 
         let results = session.wait().await?;
-        results.into_values().collect::<Result<Vec<()>>>()?;
+        // Check if any paths failed
+        let failures: Vec<_> = results
+            .into_iter()
+            .filter_map(|(path, result)| result.err().map(|e| (path, e)))
+            .collect();
+
+        if !failures.is_empty() {
+            eprintln!();
+            eprintln!("Failures:");
+            for (path, error) in &failures {
+                eprintln!("   ❌ {}: {}", path.as_os_str().to_string_lossy(), error);
+            }
+            return Err(anyhow!("{} path(s) failed to upload", failures.len()));
+        }
 
         Ok(())
     }
@@ -159,6 +191,8 @@ pub async fn run(opts: Opts) -> Result<()> {
     let push_config = PushConfig {
         num_workers: sub.jobs,
         force_preamble: sub.force_preamble,
+        chunk_upload_concurrency: sub.chunk_concurrency,
+        quiet: sub.quiet,
     };
 
     let mp = MultiProgress::new();

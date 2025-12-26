@@ -216,16 +216,20 @@ impl ApiClient {
     }
 
     /// Uploads a chunk for a chunked upload.
-    pub async fn upload_path_chunked(
+    pub async fn upload_path_chunked<S>(
         &self,
         nar_info: &UploadPathNarInfo,
         session_id: &str,
         chunk_index: u32,
         total_chunks: u32,
         chunk_hash: &str,
-        chunk_data: Bytes,
+        chunk_stream: S,
         force_preamble: bool,
-    ) -> Result<Option<UploadPathResult>> {
+    ) -> Result<Option<UploadPathResult>>
+    where
+        S: TryStream<Ok = Bytes> + Send + Sync + 'static,
+        S::Error: Into<Box<dyn StdError + Send + Sync>> + Send + Sync,
+    {
         use binix::api::v1::upload_path::{
             BINIX_CHUNK_HASH, BINIX_CHUNK_INDEX, BINIX_CHUNK_SESSION_ID, BINIX_CHUNK_TOTAL,
             BINIX_CHUNKED_UPLOAD,
@@ -245,17 +249,18 @@ impl ApiClient {
             .header(BINIX_CHUNK_HASH, chunk_hash);
 
         if force_preamble || upload_info_json.len() >= NAR_INFO_PREAMBLE_THRESHOLD {
+            let preamble = Bytes::from(upload_info_json);
+            let preamble_len = preamble.len();
+            let preamble_stream = stream::once(future::ok(preamble));
+
+            let chained = preamble_stream.chain(chunk_stream.into_stream());
             req = req
-                .header(BINIX_NAR_INFO_PREAMBLE_SIZE, upload_info_json.len())
-                .body(
-                    [upload_info_json.as_bytes(), chunk_data.as_ref()]
-                        .concat()
-                        .to_vec(),
-                );
+                .header(BINIX_NAR_INFO_PREAMBLE_SIZE, preamble_len)
+                .body(Body::wrap_stream(chained));
         } else {
             req = req
                 .header(BINIX_NAR_INFO, HeaderValue::from_str(&upload_info_json)?)
-                .body(chunk_data.to_vec());
+                .body(Body::wrap_stream(chunk_stream));
         }
 
         let res = req.send().await?;

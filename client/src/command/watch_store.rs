@@ -35,6 +35,14 @@ pub struct WatchStore {
     #[clap(short = 'j', long, default_value = "5")]
     jobs: usize,
 
+    /// The maximum number of parallel chunk uploads for large files.
+    #[clap(long, default_value = "4")]
+    chunk_concurrency: usize,
+
+    /// Suppress progress bars, show only errors and final summary.
+    #[clap(short, long)]
+    quiet: bool,
+
     /// Always send the upload info as part of the payload.
     #[clap(long, hide = true)]
     force_preamble: bool,
@@ -65,6 +73,8 @@ pub async fn run(opts: Opts) -> Result<()> {
     let push_config = PushConfig {
         num_workers: sub.jobs,
         force_preamble: sub.force_preamble,
+        chunk_upload_concurrency: sub.chunk_concurrency,
+        quiet: sub.quiet,
     };
 
     let push_session_config = PushSessionConfig {

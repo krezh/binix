@@ -279,9 +279,11 @@ async fn run_chunked_session_cleanup(state: State) {
     loop {
         interval.tick().await;
 
-        if let Ok(cleaned) = state.chunked_session_manager.cleanup_expired().await {
-            if cleaned > 0 {
-                tracing::info!("Cleaned up {} expired chunked upload sessions", cleaned);
+        if let Ok(database) = state.database().await {
+            if let Ok(cleaned) = state.chunked_session_manager.cleanup_expired(&database).await {
+                if cleaned > 0 {
+                    tracing::info!("Cleaned up {} expired chunked upload sessions", cleaned);
+                }
             }
         }
     }

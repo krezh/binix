@@ -14,6 +14,8 @@ mod m20230112_000003_add_nar_num_chunks;
 mod m20230112_000004_migrate_nar_remote_files_to_chunks;
 mod m20230112_000005_drop_old_nar_columns;
 mod m20230112_000006_add_nar_completeness_hint;
+mod m20251217_000001_create_chunked_upload_session_table;
+mod m20251219_000001_drop_next_expected_chunk;
 
 pub struct Migrator;
 
@@ -33,6 +35,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20230112_000004_migrate_nar_remote_files_to_chunks::Migration),
             Box::new(m20230112_000005_drop_old_nar_columns::Migration),
             Box::new(m20230112_000006_add_nar_completeness_hint::Migration),
+            Box::new(m20251217_000001_create_chunked_upload_session_table::Migration),
+            Box::new(m20251219_000001_drop_next_expected_chunk::Migration),
         ]
     }
 }

@@ -21,7 +21,7 @@ use sea_orm::sea_query::Expr;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{QuerySelect, TransactionTrait};
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncBufRead, AsyncReadExt};
+use tokio::io::{AsyncBufRead, AsyncRead, AsyncReadExt};
 use tokio::sync::Semaphore;
 use tokio::task::spawn;
 use tokio_util::io::StreamReader;
@@ -241,33 +241,47 @@ async fn handle_chunked_upload(
         .map_err(|_| ErrorKind::RequestError(anyhow!("Invalid chunk hash header")))?
         .to_string();
 
-    let chunk_size = state.config.chunked_upload.max_chunk_size;
-
     let session_id = if let Some(sid) = session_id {
-        // Check if session exists, if not create it with the provided ID
-        if !state
+        // Check if session exists
+        if state
             .chunked_session_manager
-            .session_exists(&sid)
+            .session_exists(&sid, database)
             .await
+            .map_err(|e| ErrorKind::RequestError(e.into()))?
         {
+            // Validate that parameters match
+            if state
+                .chunked_session_manager
+                .validate_session(&sid, total_chunks, upload_info.nar_size, database)
+                .await
+                .is_err()
+            {
+                return Err(ErrorKind::RequestError(anyhow!(
+                    "Session parameters mismatch for session {}. Expected total_chunks: {}, nar_size: {}",
+                    sid,
+                    total_chunks,
+                    upload_info.nar_size
+                ))
+                .into());
+            }
+        } else {
             state
                 .chunked_session_manager
-                .create_session(sid.clone(), cache.id, upload_info.clone(), total_chunks, chunk_size)
+                .create_session(sid.clone(), cache.id, upload_info.clone(), total_chunks, database)
                 .await
                 .map_err(|e| ErrorKind::RequestError(e.into()))?;
         }
         sid
     } else {
-        // No session ID provided, generate a new one
-        use uuid::Uuid;
         let new_id = Uuid::new_v4().to_string();
         state
             .chunked_session_manager
-            .create_session(new_id.clone(), cache.id, upload_info.clone(), total_chunks, chunk_size)
+            .create_session(new_id.clone(), cache.id, upload_info.clone(), total_chunks, database)
             .await
             .map_err(|e| ErrorKind::RequestError(e.into()))?
     };
 
+    // Read chunk data from stream
     let mut chunk_data = Vec::new();
     stream
         .read_to_end(&mut chunk_data)
@@ -276,6 +290,7 @@ async fn handle_chunked_upload(
 
     let chunk_bytes = Bytes::from(chunk_data);
 
+    // Validate chunk hash
     let chunk_hash = {
         let mut hasher = Sha256::new();
         hasher.update(&chunk_bytes);
@@ -292,59 +307,70 @@ async fn handle_chunked_upload(
         .into());
     }
 
-    state
+    // Prepare chunk stream (don't update session state yet)
+    let (reader, already_received) = state
         .chunked_session_manager
-        .write_chunk(&session_id, chunk_index, chunk_bytes)
+        .prepare_chunk_stream(&session_id, chunk_index, &chunk_bytes, database)
         .await
         .map_err(|e| ErrorKind::RequestError(e.into()))?;
 
+    // If already received, skip processing and check if complete
+    if already_received {
+        let is_complete = state
+            .chunked_session_manager
+            .is_complete(&session_id, database)
+            .await
+            .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+        if is_complete {
+            return finalize_chunked_upload(session_id, database, &state, req_state.auth.username().map(str::to_string)).await;
+        } else {
+            return Ok(Json(UploadPathResult {
+                kind: UploadPathResultKind::ChunkReceived,
+                file_size: None,
+                frac_deduplicated: None,
+            }));
+        }
+    }
+
+    // Process through CDC chunking
+    let compression_config = &state.config.compression;
+    let compression_type = compression_config.r#type;
+    let compression_level = compression_config.level();
+
+    let cdc_chunks = process_cdc_chunks(
+        reader,
+        chunk_index,
+        compression_type,
+        compression_level,
+        database.clone(),
+        state.clone(),
+    )
+    .await?;
+
+    // Mark chunk as successfully received and store CDC chunks
+    state
+        .chunked_session_manager
+        .complete_chunk(&session_id, chunk_index, &chunk_bytes, cdc_chunks, database)
+        .await
+        .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+    tracing::debug!(
+        "Chunk {} completed for session {}, checking if upload is complete",
+        chunk_index,
+        session_id
+    );
+
+    // Check if upload is complete
     let is_complete = state
         .chunked_session_manager
-        .is_complete(&session_id)
+        .is_complete(&session_id, database)
         .await
         .map_err(|e| ErrorKind::RequestError(e.into()))?;
 
     if is_complete {
-        let reassembled_stream = state
-            .chunked_session_manager
-            .get_reassembled_stream(&session_id)
-            .await
-            .map_err(|e| ErrorKind::RequestError(e.into()))?;
-
-        let username = req_state.auth.username().map(str::to_string);
-
-        if let Some(existing_nar) = database.find_and_lock_nar(&upload_info.nar_hash).await? {
-            let missing_chunk = ChunkRef::find()
-                .filter(chunkref::Column::NarId.eq(existing_nar.id))
-                .filter(chunkref::Column::ChunkId.is_null())
-                .limit(1)
-                .one(database)
-                .await
-                .map_err(ServerError::database_error)?;
-
-            if missing_chunk.is_none() {
-                return upload_path_dedup(
-                    username,
-                    cache,
-                    upload_info,
-                    reassembled_stream,
-                    database,
-                    &state,
-                    existing_nar,
-                )
-                .await;
-            }
-        }
-
-        upload_path_new(
-            username,
-            cache,
-            upload_info,
-            reassembled_stream,
-            database,
-            &state,
-        )
-        .await
+        tracing::info!("Upload complete for session {}, finalizing", session_id);
+        finalize_chunked_upload(session_id, database, &state, req_state.auth.username().map(str::to_string)).await
     } else {
         Ok(Json(UploadPathResult {
             kind: UploadPathResultKind::ChunkReceived,
@@ -352,6 +378,358 @@ async fn handle_chunked_upload(
             frac_deduplicated: None,
         }))
     }
+}
+
+/// Processes a client chunk through CDC chunking and uploads CDC chunks to S3.
+async fn process_cdc_chunks(
+    stream: Box<dyn AsyncBufRead + Send + Unpin>,
+    source_chunk_index: u32,
+    compression_type: CompressionType,
+    compression_level: CompressionLevel,
+    database: DatabaseConnection,
+    state: State,
+) -> ServerResult<Vec<crate::chunked_session::StoredChunkInfo>> {
+    // Stream through CDC chunker
+    let chunking_config = &state.config.chunking;
+    let chunk_stream = chunk_stream(
+        stream,
+        chunking_config.min_size,
+        chunking_config.avg_size,
+        chunking_config.max_size,
+    );
+
+    // Process CDC chunks in parallel with bounded concurrency
+    // Use buffered() to maintain order (required for correct position tracking)
+    let concurrency = state.config.chunked_upload.cdc_upload_concurrency;
+    let cdc_chunks: Vec<_> = chunk_stream
+        .enumerate()
+        .map(|(position, cdc_chunk_result)| {
+            let compression_type = compression_type;
+            let compression_level = compression_level;
+            let database = database.clone();
+            let state = state.clone();
+
+            async move {
+                let cdc_chunk_bytes = cdc_chunk_result.map_err(ServerError::request_error)?;
+
+                // Upload CDC chunk to S3
+                let result = upload_chunk(
+                    ChunkData::Bytes(cdc_chunk_bytes),
+                    compression_type,
+                    compression_level,
+                    database,
+                    state,
+                    false, // Don't require proof of possession - we created this data
+                )
+                .await?;
+
+                Ok::<_, ServerError>(crate::chunked_session::StoredChunkInfo {
+                    source_chunk_index,
+                    position_in_chunk: position as u32,
+                    chunk_id: result.guard.id,
+                    chunk_hash: result.guard.chunk_hash.clone(),
+                    compression: result.guard.compression.clone(),
+                })
+            }
+        })
+        .buffered(concurrency)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<ServerResult<Vec<_>>>()?;
+
+    Ok(cdc_chunks)
+}
+
+/// Finalizes a chunked upload after all chunks have been received.
+async fn finalize_chunked_upload(
+    session_id: String,
+    database: &DatabaseConnection,
+    state: &State,
+    username: Option<String>,
+) -> ServerResult<Json<UploadPathResult>> {
+    // Finalize session - gets CDC chunks
+    let (cache_id, nar_info, mut cdc_chunks) = state
+        .chunked_session_manager
+        .finalize_session(&session_id, database)
+        .await
+        .map_err(|e| ErrorKind::RequestError(e.into()))?;
+
+    // Sort CDC chunks by source chunk index and position to ensure correct order
+    cdc_chunks.sort_by(|a, b| {
+        a.source_chunk_index
+            .cmp(&b.source_chunk_index)
+            .then(a.position_in_chunk.cmp(&b.position_in_chunk))
+    });
+
+    let compression_config = &state.config.compression;
+    let compression_type = compression_config.r#type;
+    let compression: Compression = compression_type.into();
+
+    // Check if NAR already exists with all chunks present
+    if let Some(existing_nar) = database.find_and_lock_nar(&nar_info.nar_hash).await? {
+        let missing_chunk = ChunkRef::find()
+            .filter(chunkref::Column::NarId.eq(existing_nar.id))
+            .filter(chunkref::Column::ChunkId.is_null())
+            .limit(1)
+            .one(database)
+            .await
+            .map_err(ServerError::database_error)?;
+
+        if missing_chunk.is_none() {
+            // Download CDC chunks and validate hash (unless skipped)
+            if !state.config.chunked_upload.skip_nar_hash_validation {
+                validate_nar_hash_from_cdc_chunks(&cdc_chunks, &nar_info, database, state).await?;
+            }
+
+            // NAR is complete, create object mapping
+            let txn = database
+                .begin()
+                .await
+                .map_err(ServerError::database_error)?;
+
+            Object::insert({
+                let mut new_object = nar_info.to_active_model();
+                new_object.cache_id = Set(cache_id);
+                new_object.nar_id = Set(existing_nar.id);
+                new_object.created_at = Set(Utc::now());
+                new_object.created_by = Set(username.clone());
+                new_object
+            })
+            .on_conflict_do_update()
+            .exec(&txn)
+            .await
+            .map_err(ServerError::database_error)?;
+
+            txn.commit().await.map_err(ServerError::database_error)?;
+
+            return Ok(Json(UploadPathResult {
+                kind: UploadPathResultKind::Deduplicated,
+                file_size: Some(nar_info.nar_size),
+                frac_deduplicated: Some(1.0),
+            }));
+        }
+    }
+
+    // Create new NAR
+    let nar_size_db = i64::try_from(nar_info.nar_size).map_err(ServerError::request_error)?;
+
+    let nar_id = {
+        let model = nar::ActiveModel {
+            state: Set(NarState::PendingUpload),
+            compression: Set(compression.to_string()),
+            nar_hash: Set(nar_info.nar_hash.to_typed_base16()),
+            nar_size: Set(nar_size_db),
+            num_chunks: Set(0),
+            created_at: Set(Utc::now()),
+            ..Default::default()
+        };
+
+        let insertion = Nar::insert(model)
+            .exec(database)
+            .await
+            .map_err(ServerError::database_error)?;
+
+        insertion.last_insert_id
+    };
+
+    let cleanup = Finally::new({
+        let database = database.clone();
+        let nar_model = nar::ActiveModel {
+            id: Set(nar_id),
+            ..Default::default()
+        };
+
+        async move {
+            tracing::warn!("Error occurred - Cleaning up NAR entry");
+
+            if let Err(e) = Nar::delete(nar_model).exec(&database).await {
+                tracing::warn!("Failed to unregister failed NAR: {}", e);
+            }
+        }
+    });
+
+    // Download CDC chunks and validate hash (unless skipped)
+    if !state.config.chunked_upload.skip_nar_hash_validation {
+        validate_nar_hash_from_cdc_chunks(&cdc_chunks, &nar_info, database, state).await?;
+    }
+
+    let txn = database
+        .begin()
+        .await
+        .map_err(ServerError::database_error)?;
+
+    // Create chunk references in batches to avoid PostgreSQL parameter limit
+    const BATCH_SIZE: usize = 1000;
+    for (batch_idx, batch) in cdc_chunks.chunks(BATCH_SIZE).enumerate() {
+        let start_seq = batch_idx * BATCH_SIZE;
+
+        let chunk_refs: Vec<chunkref::ActiveModel> = batch
+            .iter()
+            .enumerate()
+            .map(|(i, chunk_info)| chunkref::ActiveModel {
+                nar_id: Set(nar_id),
+                seq: Set((start_seq + i) as i32),
+                chunk_id: Set(Some(chunk_info.chunk_id)),
+                chunk_hash: Set(chunk_info.chunk_hash.clone()),
+                compression: Set(chunk_info.compression.clone()),
+                ..Default::default()
+            })
+            .collect();
+
+        ChunkRef::insert_many(chunk_refs)
+            .exec(&txn)
+            .await
+            .map_err(ServerError::database_error)?;
+    }
+
+    // Mark NAR as valid
+    Nar::update(nar::ActiveModel {
+        id: Set(nar_id),
+        state: Set(NarState::Valid),
+        num_chunks: Set(cdc_chunks.len() as i32),
+        ..Default::default()
+    })
+    .exec(&txn)
+    .await
+    .map_err(ServerError::database_error)?;
+
+    // Create object mapping
+    Object::insert({
+        let mut new_object = nar_info.to_active_model();
+        new_object.cache_id = Set(cache_id);
+        new_object.nar_id = Set(nar_id);
+        new_object.created_at = Set(Utc::now());
+        new_object.created_by = Set(username);
+        new_object
+    })
+    .on_conflict_do_update()
+    .exec(&txn)
+    .await
+    .map_err(ServerError::database_error)?;
+
+    txn.commit().await.map_err(ServerError::database_error)?;
+
+    cleanup.cancel();
+
+    Ok(Json(UploadPathResult {
+        kind: UploadPathResultKind::Uploaded,
+        file_size: Some(nar_info.nar_size),
+        frac_deduplicated: None,
+    }))
+}
+
+/// Downloads CDC chunks and validates NAR hash.
+///
+/// Uses bounded concurrency to limit memory usage - only a few chunks
+/// are in memory at any time.
+async fn validate_nar_hash_from_cdc_chunks(
+    cdc_chunks: &[crate::chunked_session::StoredChunkInfo],
+    nar_info: &UploadPathNarInfo,
+    database: &DatabaseConnection,
+    state: &State,
+) -> ServerResult<()> {
+    use async_compression::tokio::bufread::{BrotliDecoder, XzDecoder, ZstdDecoder};
+    use futures::stream::StreamExt;
+
+    let mut hasher = Sha256::new();
+    let mut total_size = 0usize;
+
+    // Process chunks in order with bounded concurrency (5 chunks buffered ahead)
+    let mut chunk_stream = futures::stream::iter(cdc_chunks.iter().cloned())
+        .map(|chunk_info| {
+            let database = database.clone();
+            let state = state.clone();
+
+            async move {
+                let chunk = Chunk::find_by_id(chunk_info.chunk_id)
+                    .one(&database)
+                    .await
+                    .map_err(ServerError::database_error)?
+                    .ok_or_else(|| {
+                        ErrorKind::RequestError(anyhow!(
+                            "CDC chunk {} not found",
+                            chunk_info.chunk_id
+                        ))
+                    })?;
+
+                let storage = state.storage().await?;
+                let download = storage
+                    .download_file_db(&chunk.remote_file.0, true)
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            "Failed to download CDC chunk {}: {}",
+                            chunk_info.chunk_id,
+                            e
+                        );
+                        e
+                    })?;
+
+                let reader: Box<dyn AsyncBufRead + Send + Unpin> = match download {
+                    crate::storage::Download::AsyncRead(r) => {
+                        Box::new(tokio::io::BufReader::new(r))
+                    }
+                    crate::storage::Download::Url(_) => {
+                        return Err(ErrorKind::RequestError(anyhow!(
+                            "Expected stream, got URL from storage backend"
+                        ))
+                        .into());
+                    }
+                };
+
+                // Decompress based on the chunk's stored compression type
+                let decompressed: Box<dyn AsyncRead + Send + Unpin> =
+                    match chunk.compression.as_str() {
+                        "none" => Box::new(reader),
+                        "br" => Box::new(BrotliDecoder::new(reader)),
+                        "zstd" => Box::new(ZstdDecoder::new(reader)),
+                        "xz" => Box::new(XzDecoder::new(reader)),
+                        other => {
+                            return Err(ErrorKind::RequestError(anyhow!(
+                                "Unknown compression type: {}",
+                                other
+                            ))
+                            .into());
+                        }
+                    };
+
+                let mut chunk_data = Vec::new();
+                let mut buf_reader = tokio::io::BufReader::new(decompressed);
+                buf_reader
+                    .read_to_end(&mut chunk_data)
+                    .await
+                    .map_err(ServerError::request_error)?;
+
+                Ok::<_, ServerError>(chunk_data)
+            }
+        })
+        .buffered(5);
+
+    // Process each chunk immediately as it completes (in order)
+    while let Some(result) = chunk_stream.next().await {
+        let chunk_data = result?;
+        total_size += chunk_data.len();
+        hasher.update(&chunk_data);
+    }
+
+    // Compute final hash
+    let hash_result = hasher.finalize();
+    let computed_hash = Hash::Sha256(hash_result.as_slice().try_into().unwrap());
+
+    // Validate
+    if computed_hash != nar_info.nar_hash || total_size != nar_info.nar_size {
+        return Err(ErrorKind::RequestError(anyhow!(
+            "NAR hash validation failed: expected {}, got {}, size: expected {}, got {}",
+            nar_info.nar_hash.to_typed_base16(),
+            computed_hash.to_typed_base16(),
+            nar_info.nar_size,
+            total_size
+        ))
+        .into());
+    }
+
+    Ok(())
 }
 
 /// Uploads a path when there is already a matching NAR in the global cache.

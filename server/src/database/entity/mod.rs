@@ -4,6 +4,7 @@
 
 pub mod cache;
 pub mod chunk;
+pub mod chunked_upload_session;
 pub mod chunkref;
 pub mod nar;
 pub mod object;

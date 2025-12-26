@@ -1,0 +1,56 @@
+name: binix-action
+author: krezh
+description: Cache Nix derivations with Binix
+
+inputs:
+  flake-ref:
+    description: Flake reference for binix installation
+    required: false
+    default: "github:krezh/binix"
+  endpoint:
+    description: Binix server endpoint
+    required: true
+  cache:
+    description: Binix cache name
+    required: true
+  token:
+    description: Binix access token
+    required: false
+    default: ""
+  server-name:
+    description: Name for the server configuration
+    required: false
+    default: "default"
+  skip-use:
+    description: Skip adding the cache as a substituter
+    required: false
+    default: "false"
+  skip-push:
+    description: Skip pushing derivations to the cache
+    required: false
+    default: "false"
+  jobs:
+    description: Number of parallel upload jobs
+    required: false
+    default: "5"
+  chunk-concurrency:
+    description: Number of parallel chunk uploads for large files
+    required: false
+    default: "4"
+  include-paths:
+    description: Regex patterns for paths to include (one per line)
+    required: false
+    default: ""
+  exclude-paths:
+    description: Regex patterns for paths to exclude (one per line)
+    required: false
+    default: ""
+
+branding:
+  icon: layers
+  color: purple
+
+runs:
+  using: node20
+  main: dist/index.js
+  post: dist/index.js

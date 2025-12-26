@@ -12,12 +12,11 @@
 //! Use this when the list of store paths is streamed from some external
 //! source (e.g., FS watcher, Unix Domain Socket) and a push plan cannot be
 //! created statically.
-//!
-//! TODO: Refactor out progress reporting and support a simple output style without progress bars
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -51,6 +50,48 @@ pub struct PushConfig {
 
     /// Whether to always include the upload info in the PUT payload.
     pub force_preamble: bool,
+
+    /// Number of concurrent chunk uploads for large files.
+    pub chunk_upload_concurrency: usize,
+
+    /// Suppress progress bars, show only errors and final summary.
+    pub quiet: bool,
+}
+
+/// Tracks statistics during a push operation.
+#[derive(Debug)]
+pub struct PushStats {
+    pub paths_total: AtomicUsize,
+    pub paths_uploaded: AtomicUsize,
+    pub paths_deduplicated: AtomicUsize,
+    pub paths_failed: AtomicUsize,
+    pub bytes_total: AtomicU64,
+    pub bytes_uploaded: AtomicU64,
+    pub bytes_deduplicated: AtomicU64,
+    pub start_time: Instant,
+    pub errors: Mutex<Vec<(String, String)>>,
+}
+
+impl PushStats {
+    pub fn new() -> Self {
+        Self {
+            paths_total: AtomicUsize::new(0),
+            paths_uploaded: AtomicUsize::new(0),
+            paths_deduplicated: AtomicUsize::new(0),
+            paths_failed: AtomicUsize::new(0),
+            bytes_total: AtomicU64::new(0),
+            bytes_uploaded: AtomicU64::new(0),
+            bytes_deduplicated: AtomicU64::new(0),
+            start_time: Instant::now(),
+            errors: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl Default for PushStats {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Configuration for a push session.
@@ -73,8 +114,12 @@ pub struct Pusher {
     store: Arc<NixStore>,
     cache: CacheName,
     cache_config: CacheConfig,
-    workers: Vec<JoinHandle<HashMap<StorePath, Result<()>>>>,
+    workers: Vec<JoinHandle<()>>,
     sender: JobSender,
+    stats: Arc<PushStats>,
+    overall_bar: Arc<Mutex<Option<ProgressBar>>>,
+    mp: MultiProgress,
+    config: PushConfig,
 }
 
 /// A wrapper over a `Pusher` that accepts a stream of `StorePath`s.
@@ -152,6 +197,8 @@ impl Pusher {
         config: PushConfig,
     ) -> Self {
         let (sender, receiver) = channel::unbounded();
+        let stats = Arc::new(PushStats::new());
+        let overall_bar = Arc::new(Mutex::new(None));
         let mut workers = Vec::new();
 
         for _ in 0..config.num_workers {
@@ -162,6 +209,8 @@ impl Pusher {
                 cache.clone(),
                 mp.clone(),
                 config,
+                stats.clone(),
+                overall_bar.clone(),
             )));
         }
 
@@ -172,7 +221,33 @@ impl Pusher {
             cache_config,
             workers,
             sender,
+            stats,
+            overall_bar,
+            mp,
+            config,
         }
+    }
+
+    /// Initializes the overall progress bar with total paths and bytes.
+    pub async fn init_progress(&self, total_paths: usize, total_bytes: u64) {
+        self.stats.paths_total.store(total_paths, Ordering::Relaxed);
+        self.stats.bytes_total.store(total_bytes, Ordering::Relaxed);
+
+        if self.config.quiet {
+            return;
+        }
+
+        let template =
+            "{spinner:.cyan} [{bar:30.green/dim}] {pos}/{len} paths | {bytes}/{total_bytes} | ETA {eta}";
+        let style = ProgressStyle::with_template(template)
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+            .progress_chars("━━─");
+
+        let bar = self.mp.insert(0, ProgressBar::new(total_bytes));
+        bar.set_style(style);
+        bar.set_length(total_bytes);
+        *self.overall_bar.lock().await = Some(bar);
     }
 
     /// Queues a store path to be pushed.
@@ -180,22 +255,104 @@ impl Pusher {
         self.sender.send(path_info).await.map_err(|e| anyhow!(e))
     }
 
-    /// Waits for all workers to terminate, returning all results.
-    ///
-    /// TODO: Stream the results with another channel
-    pub async fn wait(self) -> HashMap<StorePath, Result<()>> {
-        drop(self.sender);
+    /// Waits for all workers to terminate and prints summary.
+    pub async fn wait(mut self) -> Result<()> {
+        // Take sender to close channel
+        let sender = std::mem::replace(&mut self.sender, channel::unbounded().0);
+        drop(sender);
 
-        let results = join_all(self.workers)
-            .await
-            .into_iter()
-            .map(|joinresult| joinresult.unwrap())
-            .fold(HashMap::new(), |mut acc, results| {
-                acc.extend(results);
-                acc
-            });
+        // Wait for all workers
+        let workers = std::mem::take(&mut self.workers);
+        for worker in workers {
+            let _ = worker.await;
+        }
 
-        results
+        // Finish overall progress bar
+        if let Some(bar) = self.overall_bar.lock().await.as_ref() {
+            bar.finish_and_clear();
+        }
+
+        // Print summary
+        self.print_summary();
+
+        // Return error if any paths failed
+        let errors = self.stats.errors.lock().await;
+        if !errors.is_empty() {
+            return Err(anyhow!("{} path(s) failed to upload", errors.len()));
+        }
+
+        Ok(())
+    }
+
+    /// Prints a summary of the push operation.
+    fn print_summary(&self) {
+        let stats = &self.stats;
+        let elapsed = stats.start_time.elapsed();
+        let uploaded = stats.paths_uploaded.load(Ordering::Relaxed);
+        let deduplicated = stats.paths_deduplicated.load(Ordering::Relaxed);
+        let failed = stats.paths_failed.load(Ordering::Relaxed);
+        let bytes_uploaded = stats.bytes_uploaded.load(Ordering::Relaxed);
+        let bytes_dedup = stats.bytes_deduplicated.load(Ordering::Relaxed);
+
+        // Only print summary if we actually did something
+        if uploaded == 0 && deduplicated == 0 && failed == 0 {
+            return;
+        }
+
+        let speed = if elapsed.as_secs_f64() > 0.0 {
+            (bytes_uploaded as f64 / elapsed.as_secs_f64()) as u64
+        } else {
+            0
+        };
+
+        eprintln!();
+        eprintln!("────────────────────────────────────────────────────────────");
+
+        if failed == 0 {
+            eprintln!(
+                "✅ Push complete in {:.1}s",
+                elapsed.as_secs_f64()
+            );
+        } else {
+            eprintln!(
+                "⚠️  Push complete in {:.1}s (with errors)",
+                elapsed.as_secs_f64()
+            );
+        }
+        eprintln!();
+
+        if uploaded > 0 {
+            eprintln!(
+                "   Uploaded:     {:>3} paths ({}) at {}/s",
+                uploaded,
+                HumanBytes(bytes_uploaded),
+                HumanBytes(speed)
+            );
+        }
+        if deduplicated > 0 {
+            eprintln!(
+                "   Deduplicated: {:>3} paths ({} saved)",
+                deduplicated,
+                HumanBytes(bytes_dedup)
+            );
+        }
+        if failed > 0 {
+            eprintln!("   Failed:       {:>3} paths", failed);
+        }
+
+        // Print errors if any
+        if failed > 0 {
+            eprintln!();
+            eprintln!("Failures:");
+            // We can't await here, so we use blocking lock
+            if let Ok(errors) = stats.errors.try_lock() {
+                for (path, error) in errors.iter() {
+                    eprintln!("   ❌ {}: {}", path, error);
+                }
+            }
+        }
+
+        eprintln!("────────────────────────────────────────────────────────────");
     }
 
     /// Creates a push plan.
@@ -233,9 +390,9 @@ impl Pusher {
         cache: CacheName,
         mp: MultiProgress,
         config: PushConfig,
-    ) -> HashMap<StorePath, Result<()>> {
-        let mut results = HashMap::new();
-
+        stats: Arc<PushStats>,
+        overall_bar: Arc<Mutex<Option<ProgressBar>>>,
+    ) {
         loop {
             let path_info = match receiver.recv().await {
                 Ok(path_info) => path_info,
@@ -245,23 +402,64 @@ impl Pusher {
                 }
             };
 
-            let store_path = path_info.path.clone();
+            let path_name = path_info.path.as_os_str().to_string_lossy().to_string();
+            let nar_size = path_info.nar_size;
 
-            let r = upload_path(
+            let result = upload_path(
                 path_info,
                 store.clone(),
                 api.clone(),
                 &cache,
                 mp.clone(),
-                config.force_preamble,
+                config,
+                stats.clone(),
             )
             .await;
 
-            results.insert(store_path, r);
-        }
+            // Update stats and log result
+            match result {
+                Ok(UploadOutcome::Uploaded) => {
+                    stats.paths_uploaded.fetch_add(1, Ordering::Relaxed);
+                    stats.bytes_uploaded.fetch_add(nar_size, Ordering::Relaxed);
+                    if !config.quiet {
+                        mp.suspend(|| {
+                            eprintln!("✅ {} ({})", path_name, HumanBytes(nar_size));
+                        });
+                    }
+                }
+                Ok(UploadOutcome::Deduplicated) => {
+                    stats.paths_deduplicated.fetch_add(1, Ordering::Relaxed);
+                    stats.bytes_deduplicated.fetch_add(nar_size, Ordering::Relaxed);
+                    if !config.quiet {
+                        mp.suspend(|| {
+                            eprintln!("✅ {} ({}, deduplicated)", path_name, HumanBytes(nar_size));
+                        });
+                    }
+                }
+                Err(e) => {
+                    stats.paths_failed.fetch_add(1, Ordering::Relaxed);
+                    let error_msg = e.to_string();
+                    mp.suspend(|| {
+                        eprintln!("❌ {}: {}", path_name, error_msg);
+                    });
+                    let mut errors = stats.errors.lock().await;
+                    errors.push((path_name, error_msg));
+                }
+            }
 
-        results
+            // Update overall progress bar
+            if let Some(bar) = overall_bar.lock().await.as_ref() {
+                bar.inc(nar_size);
+            }
+        }
     }
+}
+
+/// Outcome of uploading a path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UploadOutcome {
+    Uploaded,
+    Deduplicated,
 }
 
 impl PushSession {
@@ -366,8 +564,15 @@ impl PushSession {
             drop(known_paths);
 
             if done {
-                let result = pusher.wait().await;
-                result_sender.send(Ok(result)).await?;
+                // Wait for pusher to complete and handle any errors
+                let wait_result = pusher.wait().await;
+                // Convert to HashMap format for compatibility
+                let result_map = HashMap::new();
+                if let Err(e) = wait_result {
+                    result_sender.send(Err(e)).await?;
+                } else {
+                    result_sender.send(Ok(result_map)).await?;
+                }
                 return Ok(());
             }
         }
@@ -503,13 +708,10 @@ pub async fn upload_path(
     api: ApiClient,
     cache: &CacheName,
     mp: MultiProgress,
-    force_preamble: bool,
-) -> Result<()> {
+    config: PushConfig,
+    _stats: Arc<PushStats>,
+) -> Result<UploadOutcome> {
     if path_info.nar_size >= chunked_upload::CHUNKING_THRESHOLD as u64 {
-        let config = PushConfig {
-            num_workers: 1,
-            force_preamble,
-        };
         return chunked_upload::upload_path_chunked(
             path_info, store, api, cache, mp, config,
         )
@@ -548,36 +750,40 @@ pub async fn upload_path(
         }
     };
 
-    let template = format!(
-        "{{spinner}} {: <20.20} {{bar:40.green/blue}} {{human_bytes:10}} ({{average_speed}})",
-        path.name(),
-    );
-    let style = ProgressStyle::with_template(&template)
-        .unwrap()
-        .tick_chars("🕛🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚✅")
-        .progress_chars("██ ")
-        .with_key("human_bytes", |state: &ProgressState, w: &mut dyn Write| {
-            write!(w, "{}", HumanBytes(state.pos())).unwrap();
-        })
-        // Adapted from
-        // <https://github.com/console-rs/indicatif/issues/394#issuecomment-1309971049>
-        .with_key(
-            "average_speed",
-            |state: &ProgressState, w: &mut dyn Write| match (state.pos(), state.elapsed()) {
-                (pos, elapsed) if elapsed > Duration::ZERO => {
-                    write!(w, "{}", average_speed(pos, elapsed)).unwrap();
-                }
-                _ => write!(w, "-").unwrap(),
-            },
+    // Create progress bar (hidden in quiet mode)
+    let bar = if config.quiet {
+        ProgressBar::hidden()
+    } else {
+        let template = format!(
+            "{{spinner}} {: <20.20} {{bar:40.green/blue}} {{human_bytes:10}} ({{average_speed}})",
+            path.name(),
         );
-    let bar = mp.add(ProgressBar::new(path_info.nar_size));
-    bar.set_style(style);
+        let style = ProgressStyle::with_template(&template)
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✓")
+            .progress_chars("━━─")
+            .with_key("human_bytes", |state: &ProgressState, w: &mut dyn Write| {
+                write!(w, "{}", HumanBytes(state.pos())).unwrap();
+            })
+            .with_key(
+                "average_speed",
+                |state: &ProgressState, w: &mut dyn Write| match (state.pos(), state.elapsed()) {
+                    (pos, elapsed) if elapsed > Duration::ZERO => {
+                        write!(w, "{}", average_speed(pos, elapsed)).unwrap();
+                    }
+                    _ => write!(w, "-").unwrap(),
+                },
+            );
+        let bar = mp.add(ProgressBar::new(path_info.nar_size));
+        bar.set_style(style);
+        bar
+    };
+
     let nar_stream = NarStreamProgress::new(store.nar_from_path(path.to_owned()), bar.clone())
         .map_ok(Bytes::from);
 
-    let start = Instant::now();
     match api
-        .upload_path(upload_info, nar_stream, force_preamble)
+        .upload_path(upload_info, nar_stream, config.force_preamble)
         .await
     {
         Ok(r) => {
@@ -587,40 +793,14 @@ pub async fn upload_path(
                 frac_deduplicated: None,
             });
 
-            let info_string: String = match r.kind {
-                UploadPathResultKind::Deduplicated => "deduplicated".to_string(),
-                _ => {
-                    let elapsed = start.elapsed();
-                    let seconds = elapsed.as_secs_f64();
-                    let speed = (path_info.nar_size as f64 / seconds) as u64;
-
-                    let mut s = format!("{}/s", HumanBytes(speed));
-
-                    if let Some(frac_deduplicated) = r.frac_deduplicated {
-                        if frac_deduplicated > 0.01f64 {
-                            s += &format!(", {:.1}% deduplicated", frac_deduplicated * 100.0);
-                        }
-                    }
-
-                    s
-                }
-            };
-
-            mp.suspend(|| {
-                eprintln!(
-                    "✅ {} ({})",
-                    path.as_os_str().to_string_lossy(),
-                    info_string
-                );
-            });
             bar.finish_and_clear();
 
-            Ok(())
+            match r.kind {
+                UploadPathResultKind::Deduplicated => Ok(UploadOutcome::Deduplicated),
+                _ => Ok(UploadOutcome::Uploaded),
+            }
         }
         Err(e) => {
-            mp.suspend(|| {
-                eprintln!("❌ {}: {}", path.as_os_str().to_string_lossy(), e);
-            });
             bar.finish_and_clear();
             Err(e)
         }

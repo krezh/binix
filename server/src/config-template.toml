@@ -164,3 +164,24 @@ token-rs256-secret-base64 = "%token_rs256_secret_base64%"
 # You can also set it via the `BINIX_SERVER_TOKEN_HS256_SECRET_BASE64`
 # environment variable.
 #token-hs256-secret-base64 = ""
+
+# Chunked upload configuration
+[chunked-upload]
+# Whether chunked uploads are enabled
+#enabled = true
+
+# Session timeout in seconds
+#session-timeout-secs = 1200  # 20 minutes
+
+# Maximum chunk size in bytes
+#max-chunk-size = 67108864  # 64 MB
+
+# Number of CDC chunks to upload concurrently during processing
+#cdc-upload-concurrency = 10
+
+# Skip server-side NAR hash validation for chunked uploads
+#
+# When enabled, the server trusts the client-provided NAR hash without
+# re-downloading all CDC chunks to verify. Individual chunk hashes are
+# still validated on upload. This significantly speeds up large uploads.
+#skip-nar-hash-validation = false
