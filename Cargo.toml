@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-package.version = "0.4.6"
+package.version = "0.4.7"
 
 members = [
 	"binix",
