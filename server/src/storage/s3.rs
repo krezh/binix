@@ -351,41 +351,9 @@ impl StorageBackend for S3Backend {
         file: &RemoteFile,
         prefer_stream: bool,
     ) -> ServerResult<Download> {
-        let (client, s3_file) = self.get_client_from_db_ref(file).await?;
-
-        let mut last_error = None;
-        for attempt in 0..3 {
-            if attempt > 0 {
-                let delay = Duration::from_millis(100 * (1 << attempt));
-                tokio::time::sleep(delay).await;
-                tracing::debug!(
-                    "Retrying S3 download (attempt {}): bucket={}, key={}",
-                    attempt + 1,
-                    s3_file.bucket,
-                    s3_file.key
-                );
-            }
-
-            let req = client
-                .get_object()
-                .bucket(&s3_file.bucket)
-                .key(&s3_file.key);
-
-            match self.get_download(req, prefer_stream).await {
-                Ok(download) => return Ok(download),
-                Err(e) => {
-                    last_error = Some(e);
-                }
-            }
-        }
-
-        let e = last_error.unwrap();
-        tracing::error!(
-            "Failed to download S3 object after 3 attempts: bucket={}, key={}",
-            s3_file.bucket,
-            s3_file.key
-        );
-        Err(e)
+        let (client, file) = self.get_client_from_db_ref(file).await?;
+        let req = client.get_object().bucket(&file.bucket).key(&file.key);
+        self.get_download(req, prefer_stream).await
     }
 
     async fn make_db_reference(&self, name: String) -> ServerResult<RemoteFile> {

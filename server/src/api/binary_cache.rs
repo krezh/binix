@@ -215,7 +215,7 @@ async fn get_nar(
         let chunk = chunks[0].as_ref().unwrap();
         let remote_file = &chunk.remote_file.0;
         let storage = state.storage().await?;
-        match storage.download_file_db(remote_file, true).await? {
+        match storage.download_file_db(remote_file, false).await? {
             Download::Url(url) => Ok(Redirect::temporary(&url).into_response()),
             Download::AsyncRead(stream) => {
                 let stream = ReaderStream::new(stream).map_err(|e| {
@@ -224,19 +224,14 @@ async fn get_nar(
                 });
                 let body = Body::from_stream(stream);
 
-                let mut response = Response::new(body);
-                response.headers_mut().insert(
-                    http::header::CONTENT_TYPE,
-                    http::HeaderValue::from_static(mime::NAR),
-                );
-
-                if let Some(file_size) = chunk.file_size {
-                    if let Ok(val) = http::HeaderValue::from_str(&file_size.to_string()) {
-                        response.headers_mut().insert(http::header::CONTENT_LENGTH, val);
-                    }
-                }
-
-                Ok(response.into_response())
+                Ok((
+                    [(
+                        http::header::CONTENT_TYPE,
+                        http::HeaderValue::from_static(mime::NAR),
+                    )],
+                    body,
+                )
+                    .into_response())
             }
         }
     } else {
@@ -263,13 +258,6 @@ async fn get_nar(
         };
 
         let chunks: VecDeque<_> = chunks.into_iter().map(Option::unwrap).collect();
-
-        // Calculate total file size for Content-Length header
-        let total_file_size: Option<i64> = chunks
-            .iter()
-            .map(|c| c.file_size)
-            .try_fold(0i64, |acc, size| size.map(|s| acc + s));
-
         let storage = state.storage().await?.clone();
 
         // TODO: Make num_prefetch configurable
@@ -280,19 +268,14 @@ async fn get_nar(
         });
         let body = Body::from_stream(merged);
 
-        let mut response = Response::new(body);
-        response.headers_mut().insert(
-            http::header::CONTENT_TYPE,
-            http::HeaderValue::from_static(mime::NAR),
-        );
-
-        if let Some(file_size) = total_file_size {
-            if let Ok(val) = http::HeaderValue::from_str(&file_size.to_string()) {
-                response.headers_mut().insert(http::header::CONTENT_LENGTH, val);
-            }
-        }
-
-        Ok(response.into_response())
+        Ok((
+            [(
+                http::header::CONTENT_TYPE,
+                http::HeaderValue::from_static(mime::NAR),
+            )],
+            body,
+        )
+            .into_response())
     }
 }
 
