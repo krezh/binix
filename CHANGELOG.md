@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.3](https://github.com/krezh/binix/compare/v0.4.2...v0.4.3) (2025-12-26)
+
+
+### Bug Fixes
+
+* **cargo:** update cc ( 1.2.49 → 1.2.51 ) ([#68](https://github.com/krezh/binix/issues/68)) ([bdb5251](https://github.com/krezh/binix/commit/bdb52512fd8ee6b5a35e3656b1ef3797944dbc4b))
+* **deps:** update @actions/exec ( 1.1.1 → 2.0.0 ) ([#81](https://github.com/krezh/binix/issues/81)) ([bd96f8f](https://github.com/krezh/binix/commit/bd96f8f2ddfc3b89bebc6914668b11a5a9c9ed9f))
+* dns resolve ([f25329e](https://github.com/krezh/binix/commit/f25329e87a7f606afa5ad9f0fe089010ae1932f4))
+
+
+### Miscellaneous Chores
+
+* **deps:** update @types/node ( 22.19.3 → 24.10.4 ) ([#79](https://github.com/krezh/binix/issues/79)) ([e2daacf](https://github.com/krezh/binix/commit/e2daacf888d4728ef07f0beeaf93c4d993e49abd))
+
 ## [0.4.2](https://github.com/krezh/binix/compare/v0.4.1...v0.4.2) (2025-12-26)
 
 
