@@ -147,7 +147,14 @@ impl S3Backend {
     ) -> ServerResult<Download> {
         if prefer_stream {
             let output = req.send().await.map_err(|e| {
-                tracing::error!("S3 GetObject failed: {:?}", e);
+                // Extract more details from the error
+                let raw = e.raw_response();
+                tracing::error!(
+                    "S3 GetObject failed: {:?}, raw_response: {:?}, source: {:?}",
+                    e,
+                    raw,
+                    std::error::Error::source(&e)
+                );
                 ServerError::storage_error(e)
             })?;
 
@@ -352,6 +359,11 @@ impl StorageBackend for S3Backend {
         prefer_stream: bool,
     ) -> ServerResult<Download> {
         let (client, file) = self.get_client_from_db_ref(file).await?;
+        tracing::debug!(
+            bucket = %file.bucket,
+            key = %file.key,
+            "Downloading from S3"
+        );
         let req = client.get_object().bucket(&file.bucket).key(&file.key);
         self.get_download(req, prefer_stream).await
     }
