@@ -215,7 +215,7 @@ async fn get_nar(
         let chunk = chunks[0].as_ref().unwrap();
         let remote_file = &chunk.remote_file.0;
         let storage = state.storage().await?;
-        match storage.download_file_db(remote_file, false).await? {
+        match storage.download_file_db(remote_file, true).await? {
             Download::Url(url) => Ok(Redirect::temporary(&url).into_response()),
             Download::AsyncRead(stream) => {
                 let stream = ReaderStream::new(stream).map_err(|e| {
