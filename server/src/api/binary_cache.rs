@@ -224,15 +224,19 @@ async fn get_nar(
                 });
                 let body = Body::from_stream(stream);
 
-                let mut response = Response::builder()
-                    .status(StatusCode::OK)
-                    .header(http::header::CONTENT_TYPE, mime::NAR);
+                let mut response = Response::new(body);
+                response.headers_mut().insert(
+                    http::header::CONTENT_TYPE,
+                    http::HeaderValue::from_static(mime::NAR),
+                );
 
                 if let Some(file_size) = chunk.file_size {
-                    response = response.header(http::header::CONTENT_LENGTH, file_size);
+                    if let Ok(val) = http::HeaderValue::from_str(&file_size.to_string()) {
+                        response.headers_mut().insert(http::header::CONTENT_LENGTH, val);
+                    }
                 }
 
-                Ok(response.body(body).unwrap().into_response())
+                Ok(response.into_response())
             }
         }
     } else {
@@ -276,15 +280,19 @@ async fn get_nar(
         });
         let body = Body::from_stream(merged);
 
-        let mut response = Response::builder()
-            .status(StatusCode::OK)
-            .header(http::header::CONTENT_TYPE, mime::NAR);
+        let mut response = Response::new(body);
+        response.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            http::HeaderValue::from_static(mime::NAR),
+        );
 
         if let Some(file_size) = total_file_size {
-            response = response.header(http::header::CONTENT_LENGTH, file_size);
+            if let Ok(val) = http::HeaderValue::from_str(&file_size.to_string()) {
+                response.headers_mut().insert(http::header::CONTENT_LENGTH, val);
+            }
         }
 
-        Ok(response.body(body).unwrap().into_response())
+        Ok(response.into_response())
     }
 }
 
