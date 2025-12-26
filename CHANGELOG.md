@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.2](https://github.com/krezh/binix/compare/v0.4.1...v0.4.2) (2025-12-26)
+
+
+### Bug Fixes
+
+* **deps:** update @actions/core ( 1.11.1 → 2.0.1 ) ([#80](https://github.com/krezh/binix/issues/80)) ([feccafd](https://github.com/krezh/binix/commit/feccafdcacef46fa27d563ec4e6f94546938ba38))
+* **deps:** update @actions/io ( 1.1.3 → 2.0.0 ) ([#82](https://github.com/krezh/binix/issues/82)) ([a09d011](https://github.com/krezh/binix/commit/a09d011a28d9d23b57ec3ff5f7b019c4d7358787))
+* improvements! ([cf8b7ee](https://github.com/krezh/binix/commit/cf8b7eeddb73d5e4187227af41a74108183370ff))
+
+
+### Miscellaneous Chores
+
+* **deps:** update esbuild ( 0.24.2 → 0.27.2 ) ([#78](https://github.com/krezh/binix/issues/78)) ([570c6e3](https://github.com/krezh/binix/commit/570c6e30bc782d6d264eebfc89323d34f4b195e8))
+
 ## [0.4.1](https://github.com/krezh/binix/compare/v0.4.0...v0.4.1) (2025-12-16)
 
 
