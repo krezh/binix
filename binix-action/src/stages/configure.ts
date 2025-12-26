@@ -6,20 +6,13 @@ export const configure = async () => {
 	core.startGroup("Configure Binix");
 
 	try {
-		const endpoint = core.getInput("endpoint", { required: true });
-		const cache = core.getInput("cache", { required: true });
+		const endpoint = core.getInput("endpoint");
+		const cache = core.getInput("cache");
 		const token = core.getInput("token");
-		const serverName = core.getInput("server-name") || "default";
 		const skipUse = core.getInput("skip-use");
 
-		core.info("Logging in to Binix server");
-
-		const loginArgs = ["login", "--set-default", serverName, endpoint];
-		if (token) {
-			loginArgs.push(token);
-		}
-
-		await exec("binix", loginArgs);
+		core.info("Logging in to Binix cache");
+		await exec("binix", ["login", "--set-default", cache, endpoint, token]);
 
 		if (skipUse === "true") {
 			core.info("Not adding Binix cache to substituters as skip-use is set to true");

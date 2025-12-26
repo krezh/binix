@@ -1,56 +1,38 @@
-name: binix-action
-author: krezh
-description: Cache Nix derivations with Binix
-
-inputs:
-  flake-ref:
-    description: Flake reference for binix installation
-    required: false
-    default: "github:krezh/binix"
-  endpoint:
-    description: Binix server endpoint
-    required: true
-  cache:
-    description: Binix cache name
-    required: true
-  token:
-    description: Binix access token
-    required: false
-    default: ""
-  server-name:
-    description: Name for the server configuration
-    required: false
-    default: "default"
-  skip-use:
-    description: Skip adding the cache as a substituter
-    required: false
-    default: "false"
-  skip-push:
-    description: Skip pushing derivations to the cache
-    required: false
-    default: "false"
-  jobs:
-    description: Number of parallel upload jobs
-    required: false
-    default: "5"
-  chunk-concurrency:
-    description: Number of parallel chunk uploads for large files
-    required: false
-    default: "4"
-  include-paths:
-    description: Regex patterns for paths to include (one per line)
-    required: false
-    default: ""
-  exclude-paths:
-    description: Regex patterns for paths to exclude (one per line)
-    required: false
-    default: ""
+name: "binix-action"
+author: "krezh"
+description: "Cache Nix derivations with Binix"
 
 branding:
-  icon: layers
-  color: purple
+  icon: "layers"
+  color: "purple"
+
+inputs:
+  endpoint:
+    description: "Binix endpoint"
+    required: true
+  cache:
+    description: "Binix cache name"
+    required: true
+  inputs-from:
+    description: "Path to get the Nixpkgs flake input from instead of `github:krezh/binix`"
+    required: false
+  include-paths:
+    description: "Regular expressions for matching paths to include when pushing (delimited by newlines)"
+    required: false
+  exclude-paths:
+    description: "Regular expressions for matching paths to exclude when pushing (delimited by newlines)"
+    required: false
+  skip-push:
+    description: "Disable pushing to the cache automatically"
+    required: false
+  token:
+    description: "Binix authorization token"
+    required: false
+  skip-use:
+    description: "Set to true to skip using Binix cache as a substituter"
+    required: false
 
 runs:
-  using: node20
-  main: dist/index.js
-  post: dist/index.js
+  using: "node24"
+  main: "dist/index.js"
+  post: "dist/index.js"

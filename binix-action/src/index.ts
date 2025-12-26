@@ -15,7 +15,7 @@ const main = async () => {
 };
 
 if (!isPost) {
-	saveState("isPost", "true");
+	saveState("isPost", true);
 	main();
 } else {
 	push();

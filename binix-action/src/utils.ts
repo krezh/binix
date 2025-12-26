@@ -1,26 +1,18 @@
 import { exec } from "@actions/exec";
+
 import { readFile } from "node:fs/promises";
 
-const STORE_PATHS_FILE = "/tmp/binix-store-paths.json";
-
 export const saveStorePaths = async () => {
-	await exec("nix", ["path-info", "--all", "--json"], {
-		outStream: require("fs").createWriteStream(STORE_PATHS_FILE),
-	});
+	await exec("sh", ["-c", "nix path-info --all --json > /tmp/store-paths"]);
 };
 
-export const getStorePaths = async (): Promise<string[]> => {
-	try {
-		const content = await readFile(STORE_PATHS_FILE, "utf-8");
-		const parsed = JSON.parse(content);
+export const getStorePaths = async () => {
+	const rawStorePaths = JSON.parse(await readFile("/tmp/store-paths", "utf8")) as { path: string }[];
 
-		// Handle both Nix 2.18+ format (array of objects) and older format (object)
-		if (Array.isArray(parsed)) {
-			return parsed.map((entry: { path: string }) => entry.path);
-		} else {
-			return Object.keys(parsed);
-		}
-	} catch {
-		return [];
+	// compatibility with Nix 2.18
+	if (Array.isArray(rawStorePaths)) {
+		return rawStorePaths.map((path) => path.path);
 	}
+
+	return Object.keys(rawStorePaths);
 };
