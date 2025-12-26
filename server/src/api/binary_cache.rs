@@ -224,14 +224,15 @@ async fn get_nar(
                 });
                 let body = Body::from_stream(stream);
 
-                Ok((
-                    [(
-                        http::header::CONTENT_TYPE,
-                        http::HeaderValue::from_static(mime::NAR),
-                    )],
-                    body,
-                )
-                    .into_response())
+                let mut response = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(http::header::CONTENT_TYPE, mime::NAR);
+
+                if let Some(file_size) = chunk.file_size {
+                    response = response.header(http::header::CONTENT_LENGTH, file_size);
+                }
+
+                Ok(response.body(body).unwrap().into_response())
             }
         }
     } else {
@@ -258,6 +259,13 @@ async fn get_nar(
         };
 
         let chunks: VecDeque<_> = chunks.into_iter().map(Option::unwrap).collect();
+
+        // Calculate total file size for Content-Length header
+        let total_file_size: Option<i64> = chunks
+            .iter()
+            .map(|c| c.file_size)
+            .try_fold(0i64, |acc, size| size.map(|s| acc + s));
+
         let storage = state.storage().await?.clone();
 
         // TODO: Make num_prefetch configurable
@@ -268,14 +276,15 @@ async fn get_nar(
         });
         let body = Body::from_stream(merged);
 
-        Ok((
-            [(
-                http::header::CONTENT_TYPE,
-                http::HeaderValue::from_static(mime::NAR),
-            )],
-            body,
-        )
-            .into_response())
+        let mut response = Response::builder()
+            .status(StatusCode::OK)
+            .header(http::header::CONTENT_TYPE, mime::NAR);
+
+        if let Some(file_size) = total_file_size {
+            response = response.header(http::header::CONTENT_LENGTH, file_size);
+        }
+
+        Ok(response.body(body).unwrap().into_response())
     }
 }
 
