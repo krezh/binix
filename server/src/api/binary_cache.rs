@@ -14,7 +14,7 @@ use axum::{
     body::Body,
     extract::{Extension, Path},
     http::StatusCode,
-    response::{IntoResponse, Redirect, Response},
+    response::{IntoResponse, Response},
     routing::get,
     Router,
 };
@@ -211,29 +211,28 @@ async fn get_nar(
     database.bump_object_last_accessed(object.id).await?;
 
     if chunks.len() == 1 {
-        // single chunk
+        // single chunk - stream through server since S3 may not be publicly accessible
         let chunk = chunks[0].as_ref().unwrap();
         let remote_file = &chunk.remote_file.0;
         let storage = state.storage().await?;
-        match storage.download_file_db(remote_file, false).await? {
-            Download::Url(url) => Ok(Redirect::temporary(&url).into_response()),
-            Download::AsyncRead(stream) => {
-                let stream = ReaderStream::new(stream).map_err(|e| {
-                    tracing::error!(%e, "Stream error");
-                    e
-                });
-                let body = Body::from_stream(stream);
+        let Download::AsyncRead(stream) = storage.download_file_db(remote_file, true).await?
+        else {
+            unreachable!("prefer_stream=true should never return URL");
+        };
+        let stream = ReaderStream::new(stream).map_err(|e| {
+            tracing::error!(%e, "Stream error");
+            e
+        });
+        let body = Body::from_stream(stream);
 
-                Ok((
-                    [(
-                        http::header::CONTENT_TYPE,
-                        http::HeaderValue::from_static(mime::NAR),
-                    )],
-                    body,
-                )
-                    .into_response())
-            }
-        }
+        Ok((
+            [(
+                http::header::CONTENT_TYPE,
+                http::HeaderValue::from_static(mime::NAR),
+            )],
+            body,
+        )
+            .into_response())
     } else {
         // reassemble NAR
         fn io_error<E: std::error::Error + Send + Sync + 'static>(e: E) -> IoError {
