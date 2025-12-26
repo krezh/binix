@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/krezh/binix/compare/v0.4.6...v0.4.7) (2025-12-26)
+
+
+### Bug Fixes
+
+* test ([820c2c2](https://github.com/krezh/binix/commit/820c2c2c3e218166496e7a0d909dc536b67da6a2))
+
 ## [0.4.6](https://github.com/krezh/binix/compare/v0.4.5...v0.4.6) (2025-12-26)
 
 
